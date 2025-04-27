@@ -1,4 +1,4 @@
-// InstagramLogin.js
+// screens/InstagramLogin.js
 import React, { useState } from "react";
 import {
   View,
@@ -10,53 +10,49 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router"; // Import useRouter
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-import { getDatabase, ref, set } from "firebase/database";
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDI6DLthnC4AKKOqgc-WZYiiI8al4p_1t8",
-  authDomain: "threadcity-95278.firebaseapp.com",
-  databaseURL:
-    "https://threadcity-95278-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "threadcity-95278",
-  storageBucket: "threadcity-95278.firebasestorage.app",
-  messagingSenderId: "534208854598",
-  appId: "1:534208854598:web:f4dedbdf2979dd9eb12847",
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-function guidulieu() {
-  const db = getDatabase();
-  set(ref(db, "dia chi gui len"), {
-    tenbien: "gia tri gui len",
-  });
-}
+import { supabase } from "../lib/supabase";
+import { useUser } from "../lib/UserContext";
 
 export default function InstagramLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [secureTextEntry, setSecureTextEntry] = useState(true);
+  const [loading, setLoading] = useState(false); // Thêm trạng thái loading
+  const { setUser } = useUser();
 
-  // Khởi tạo router để chuyển hướng
-  const router = useRouter();
+  const handleLogin = async () => {
+    if (!username || !password) {
+      alert("Vui lòng nhập email và mật khẩu");
+      return;
+    }
 
-  const handleLogin = () => {
-    console.log("Logging in with", username, password);
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: username,
+        password: password,
+      });
 
-    // Sau khi đăng nhập thành công, chuyển hướng tới trang profile
-    router.push("/profile");
-  };
+      if (error) {
+        console.error("Login error:", error.message);
+        alert("Sai email hoặc mật khẩu");
+        return;
+      }
 
-  const handleLogoPress = () => {
-    router.push("/edit"); // Chuyển hướng đến Activity
+      if (data.user) {
+        setUser(data.user);
+        console.log("Login success:", data);
+        alert("Đăng nhập thành công");
+        // Không cần router.replace("/") vì app/_layout.js sẽ xử lý điều hướng
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      alert("Lỗi không xác định khi đăng nhập");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -66,21 +62,22 @@ export default function InstagramLogin() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.logoContainer}>
-          <TouchableOpacity onPress={guidulieu}>
-            <Image
-              source={require("../assets/images/instagram-logo.png")}
-              style={styles.logo}
-            />
-          </TouchableOpacity>
+          <Image
+            source={require("../assets/images/instagram-logo.png")}
+            style={styles.logo}
+          />
         </View>
 
         <View style={styles.formContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Phone number, username, or email"
+            placeholder="Email"
             placeholderTextColor="#aaa"
             value={username}
             onChangeText={setUsername}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading} // Vô hiệu hóa khi đang loading
           />
           <TextInput
             style={styles.input}
@@ -89,28 +86,37 @@ export default function InstagramLogin() {
             secureTextEntry={secureTextEntry}
             value={password}
             onChangeText={setPassword}
+            editable={!loading}
           />
           <TouchableOpacity
             onPress={() => setSecureTextEntry(!secureTextEntry)}
             style={styles.showPasswordButton}
+            disabled={loading}
           >
             <Text style={styles.showPasswordText}>
               {secureTextEntry ? "Show" : "Hide"} Password
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
-            <Text style={styles.loginButtonText}>Log In</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity>
-            <Text style={styles.forgotPassword}>Forgot password?</Text>
+          <TouchableOpacity
+            onPress={handleLogin}
+            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Log In</Text>
+            )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.signupContainer}>
           <Text style={styles.signupText}>Don't have an account? </Text>
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push("/SignUp")}
+            disabled={loading}
+          >
             <Text style={styles.signupButton}>Sign Up</Text>
           </TouchableOpacity>
         </View>
@@ -126,23 +132,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  innerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  logo: {
-    width: 200,
-    height: 60,
-    resizeMode: "contain",
-  },
-  formContainer: {
-    width: "100%",
-  },
+  innerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  logoContainer: { alignItems: "center", marginBottom: 40 },
+  logo: { width: 200, height: 60, resizeMode: "contain" },
+  formContainer: { width: "100%" },
   input: {
     height: 40,
     borderColor: "#ccc",
@@ -152,14 +145,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontSize: 14,
   },
-  showPasswordButton: {
-    marginBottom: 20,
-    alignItems: "flex-end",
-  },
-  showPasswordText: {
-    color: "#3897f0",
-    fontSize: 14,
-  },
+  showPasswordButton: { marginBottom: 20, alignItems: "flex-end" },
+  showPasswordText: { color: "#3897f0", fontSize: 14 },
   loginButton: {
     backgroundColor: "#3897f0",
     paddingVertical: 10,
@@ -167,27 +154,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     alignItems: "center",
   },
-  loginButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+  loginButtonDisabled: {
+    backgroundColor: "#a0c4ff",
   },
-  forgotPassword: {
-    color: "#3897f0",
-    fontSize: 14,
-    textAlign: "center",
-  },
+  loginButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   signupContainer: {
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 20,
   },
-  signupText: {
-    fontSize: 14,
-  },
-  signupButton: {
-    color: "#3897f0",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
+  signupText: { fontSize: 14 },
+  signupButton: { color: "#3897f0", fontSize: 14, fontWeight: "bold" },
 });

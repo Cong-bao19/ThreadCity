@@ -1,5 +1,5 @@
-// (tabs)/Thread.js
-import React from "react";
+// app/(tabs)/thread.tsx
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,79 +9,182 @@ import {
   Image,
   SafeAreaView,
 } from "react-native";
-import { router } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import Icon from "react-native-vector-icons/Ionicons";
+import { supabase } from "@/lib/supabase";
 
-// Dữ liệu giả lập: Bài viết chính và bình luận
-const mainPost = {
-  id: "1",
-  username: "krunal_modi",
-  content: "Hey @zuck where is my verified?",
-  time: "50m",
-  avatar: "https://via.placeholder.com/40",
-  replies: 546,
-  likes: 10700,
-  isLiked: true,
-};
+// Định nghĩa interface cho bài viết và bình luận
+interface Post {
+  id: string;
+  username: string;
+  avatar: string;
+  content: string;
+  image: string | null;
+  time: string;
+  replies: number;
+  likes: number;
+  isLiked: boolean;
+}
 
-const comments = [
-  {
-    id: "2",
-    username: "zuck",
-    content: "Just a sec... 😂",
-    time: "50m",
-    avatar: "https://via.placeholder.com/40",
-    isLiked: true,
-  },
-  {
-    id: "3",
-    username: "narendra_modi",
-    content: "Welcome Modi ji! 🙏",
-    time: "50m",
-    avatar: "https://via.placeholder.com/40",
-    isLiked: true,
-  },
-  {
-    id: "4",
-    username: "shakira",
-    content: "Welcome Krunal :-)",
-    time: "50m",
-    avatar: "https://via.placeholder.com/40",
-    isLiked: true,
-  },
-  {
-    id: "5",
-    username: "figma",
-    content: "Welcome MY FRIEND 😍",
-    time: "50m",
-    avatar: "https://via.placeholder.com/40",
-    isLiked: true,
-  },
-];
+interface Comment {
+  id: string;
+  username: string;
+  avatar: string;
+  content: string;
+  time: string;
+  isLiked: boolean;
+}
 
 export default function Thread() {
+  const { postId } = useLocalSearchParams(); // Lấy postId từ query params
+  const [mainPost, setMainPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPostAndComments = async () => {
+      if (!postId) {
+        console.error("No postId provided");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Lấy bài viết chính từ bảng posts
+        const { data: postData, error: postError } = await supabase
+          .from("posts")
+          .select(`
+            id,
+            user_id,
+            content,
+            created_at,
+            image_url,
+            comments (count),
+            likes (count)
+          `)
+          .eq("id", postId)
+          .single();
+
+        if (postError) {
+          console.error("Error fetching post:", postError);
+          return;
+        }
+
+        // Lấy thông tin người đăng từ bảng profiles
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("username, avatar_url")
+          .eq("id", postData.user_id)
+          .single();
+
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          return;
+        }
+
+        // Định dạng bài viết chính
+        const formattedPost: Post = {
+          id: postData.id,
+          username: profileData.username || "Unknown",
+          avatar: profileData.avatar_url || "https://via.placeholder.com/40",
+          content: postData.content,
+          image: postData.image_url,
+          time: new Date(postData.created_at).toLocaleTimeString(),
+          replies: postData.comments?.count || 0,
+          likes: postData.likes?.count || 0,
+          isLiked: false, // Có thể thêm logic kiểm tra trạng thái like
+        };
+        setMainPost(formattedPost);
+
+        // Lấy danh sách bình luận từ bảng comments
+        const { data: commentsData, error: commentsError } = await supabase
+          .from("comments")
+          .select(`
+            id,
+            user_id,
+            content,
+            created_at
+          `)
+          .eq("post_id", postId)
+          .order("created_at", { ascending: true });
+
+        if (commentsError) {
+          console.error("Error fetching comments:", commentsError);
+          return;
+        }
+
+        // Lấy thông tin người bình luận từ bảng profiles
+        const userIds = commentsData.map((comment: any) => comment.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .in("id", userIds);
+
+        if (profilesError) {
+          console.error("Error fetching profiles for comments:", profilesError);
+          return;
+        }
+
+        const profilesMap = profilesData.reduce((acc: any, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+
+        // Định dạng danh sách bình luận
+        const formattedComments: Comment[] = commentsData.map((comment: any) => {
+          const profile = profilesMap[comment.user_id] || {};
+          return {
+            id: comment.id,
+            username: profile.username || "Unknown",
+            avatar: profile.avatar_url || "https://via.placeholder.com/40",
+            content: comment.content,
+            time: new Date(comment.created_at).toLocaleTimeString(),
+            isLiked: false, // Có thể thêm logic kiểm tra trạng thái like
+          };
+        });
+        setComments(formattedComments);
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPostAndComments();
+  }, [postId]);
+
   const handleBack = () => {
-    router.back(); // Quay lại trang trước
+    router.back();
   };
 
-  const handleLike = (threadId) => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.replace("/Login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const handleLike = (threadId: string) => {
     console.log("Liked thread:", threadId);
   };
 
-  const handleComment = (threadId) => {
+  const handleComment = (threadId: string) => {
     console.log("Comment on thread:", threadId);
   };
 
-  const handleShare = (threadId) => {
+  const handleShare = (threadId: string) => {
     console.log("Share thread:", threadId);
   };
 
-  const handleMore = (threadId) => {
+  const handleMore = (threadId: string) => {
     console.log("More options for thread:", threadId);
   };
 
-  // Component hiển thị bài viết chính hoặc bình luận
-  const renderThreadItem = (item, isMainPost = false) => (
+  const renderThreadItem = (item: Post | Comment, isMainPost = false) => (
     <View style={[styles.threadItem, !isMainPost && styles.commentItem]}>
       <Image source={{ uri: item.avatar }} style={styles.avatar} />
       <View style={styles.threadContent}>
@@ -97,6 +200,9 @@ export default function Thread() {
             )
           )}
         </Text>
+        {"image" in item && item.image && (
+          <Image source={{ uri: item.image }} style={styles.postImage} />
+        )}
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => handleLike(item.id)}>
             <Icon
@@ -127,6 +233,22 @@ export default function Thread() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!mainPost) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text>Post not found</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -134,14 +256,14 @@ export default function Thread() {
           <Icon name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerText}>Thread</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={handleLogout}>
+          <Icon name="log-out-outline" size={24} color="#000" />
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={[mainPost, ...comments]} // Kết hợp bài viết chính và bình luận
-        renderItem={
-          ({ item, index }) => renderThreadItem(item, index === 0) // Bài đầu tiên là bài viết chính
-        }
+        data={[mainPost, ...comments]}
+        renderItem={({ item, index }) => renderThreadItem(item, index === 0)}
         keyExtractor={(item) => item.id}
         style={styles.threadList}
       />
@@ -177,7 +299,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f0f0f0",
   },
   commentItem: {
-    marginLeft: 50, // Thụt lề cho bình luận
+    marginLeft: 50,
   },
   avatar: {
     width: 40,
@@ -199,6 +321,12 @@ const styles = StyleSheet.create({
   mention: {
     color: "#3897f0",
     fontWeight: "bold",
+  },
+  postImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
   },
   actions: {
     flexDirection: "row",
