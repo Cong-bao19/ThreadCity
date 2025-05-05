@@ -1,5 +1,4 @@
-// (tabs)/NewThreadScreen.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,21 +13,55 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Icon from "react-native-vector-icons/Ionicons";
+import { supabase } from "@/lib/supabase"; // Giả sử bạn đã cấu hình Supabase
 
 const NewThreadScreen = ({ onClose }) => {
   const [threadText, setThreadText] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [username, setUsername] = useState(""); // Thêm state để lưu tên người dùng
 
-  const handleAddThread = () => {
+  useEffect(() => {
+    // Lấy thông tin người dùng từ Supabase
+    const user = supabase.auth.user();
+    if (user) {
+      setUsername(user.email || "Unknown User"); // Hoặc bạn có thể lấy từ profile khác nếu có
+    }
+  }, []);
+
+  const handleAddThread = async () => {
     if (threadText.trim() === "") {
       Alert.alert("Error", "Please enter some text to create a thread.");
       return;
     }
-    Alert.alert("Success", "Thread created: " + threadText);
-    setThreadText("");
-    if (onClose) {
-      onClose();
-    } else {
-      router.back();
+
+    try {
+      const { data, error } = await supabase
+        .from("posts")
+        .insert([
+          {
+            user_id: "some-user-id", // Thay bằng user ID thật
+            context: threadText,
+            image_url: imageUrl || "",
+          },
+        ]);
+
+      if (error) {
+        Alert.alert("Error", "Failed to create thread.");
+        console.error("Error inserting post:", error);
+        return;
+      }
+
+      Alert.alert("Success", "Thread created!");
+      setThreadText("");
+      setImageUrl("");
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      Alert.alert("Error", "Failed to create thread.");
     }
   };
 
@@ -59,7 +92,7 @@ const NewThreadScreen = ({ onClose }) => {
             source={{ uri: "https://via.placeholder.com/40" }}
             style={styles.avatar}
           />
-          <Text style={styles.username}>kmodi21</Text>
+          <Text style={styles.username}>{username || "Loading..."}</Text>
         </View>
         <TextInput
           style={styles.threadInput}
@@ -138,51 +171,6 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
     justifyContent: "flex-end",
-  },
-  keyboard: {
-    backgroundColor: "#f0f0f0",
-    padding: 10,
-  },
-  suggestions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 10,
-  },
-  suggestion: {
-    fontSize: 14,
-    color: "#666",
-    backgroundColor: "#e0e0e0",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  keyboardRows: {
-    marginBottom: 10,
-  },
-  keyboardRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 5,
-  },
-  key: {
-    fontSize: 16,
-    color: "#000",
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginHorizontal: 2,
-    borderRadius: 5,
-    textAlign: "center",
-    minWidth: 30,
-  },
-  spaceKey: {
-    flex: 1,
-    marginHorizontal: 5,
-  },
-  keyboardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 10,
   },
 });
 
