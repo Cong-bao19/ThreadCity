@@ -45,9 +45,6 @@ const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-      <Image source={require("../assets/images/logo.png")} style={styles.logo}/>
-      </View>
       <Text style={styles.header}>Search</Text>
       <TextInput
         style={styles.searchInput}
@@ -72,20 +69,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: "#fff",
   },
-
-  headerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-
-  logo: {
-    width: 40,                 
-    height: 40,             
-    marginRight: 8,   
-  },
-
   header: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
   searchInput: {
     height: 40,
