@@ -7,6 +7,8 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { UserProvider } from "@/lib/UserContext";
+import { Image } from 'react-native';
+import Icon from 'react-native-vector-icons/FontAwesome';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -35,26 +37,35 @@ export default function TabLayout() {
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <IconSymbol size={28} name="house.fill" color={color} />
-            ),
+            tabBarIcon: ({ focused, color }) => {
+              const iconColor = focused ? 'black' : 'gray';
+              return <Icon name="home" size={24} color={iconColor} />;
+            },
           }}
         />
         <Tabs.Screen
           name="search"
           options={{
             title: "Search",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <IconSymbol size={28} name="magnifyingglass" color={color} />
-            ),
+            tabBarIcon: ({ focused }) => {
+              const iconColor = focused ? 'black' : 'gray'
+              return <Icon name="search" size={22} color={iconColor} />
+            },
           }}
         />
-        <Tabs.Screen
+ <Tabs.Screen
           name="NewThread"
           options={{
             title: "New Thread",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <IconSymbol size={28} name="plus.circle.fill" color={color} />
+            tabBarIcon: ({ focused, color }) => (
+              <Image
+                source={require('../../assets/images/addThread.png')}
+                style={{
+                  width: 24,
+                  height: 24,
+                  tintColor: focused ? '#000' : '#666', // Đổi màu dựa trên focus
+                }}
+              />
             ),
           }}
         />
@@ -62,8 +73,15 @@ export default function TabLayout() {
           name="Activity"
           options={{
             title: "Activity",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <IconSymbol size={28} name="heart.fill" color={color} />
+            tabBarIcon: ({ focused, color }) => (
+              <Image
+                source={require('../../assets/images/heart.png')}
+                style={{
+                  width: 22,
+                  height: 22,
+                  tintColor: focused ? '#000' : '#gray', // Đổi màu dựa trên focus
+                }}
+              />
             ),
           }}
         />
@@ -71,13 +89,23 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: "Profile",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <IconSymbol size={28} name="person.fill" color={color} />
-            ),
+            tabBarIcon: ({ focused, color }) => (
+              <Image
+                source={require('../../assets/images/person.png')}
+                style={{
+                  width: 22,
+                  height: 22,
+                  tintColor: focused ? '#000' : '#666', // Đổi màu dựa trên focus
+                }}
+              />
+            )
           }}
         />
         <Tabs.Screen name="explore" options={{ href: null }} />
+        <Tabs.Screen name="thread" options={{ href: null }} />
+        <Tabs.Screen name="edit" options={{ href: null }} />
       </Tabs>
+
     </UserProvider>
   );
 }

@@ -23,7 +23,7 @@ const posts = [
     time: "50m",
     likes: 2,
     replies: 2,
-    avatar: "https://via.placeholder.com/50",
+    avatar: "https://i.pinimg.com/736x/84/a7/fd/84a7fd755368a8f95263ff30f6179632.jpg",
     repliesData: [
       {
         id: "1-1",
@@ -32,7 +32,7 @@ const posts = [
         content: "Just a sec... 😂",
         time: "50m",
         likes: 0,
-        avatar: "https://via.placeholder.com/50",
+        avatar: "https://i.pinimg.com/736x/8e/31/96/8e3196dfb5ec71f62fee496fc6007a77.jpg",
       },
     ],
   },
@@ -44,7 +44,7 @@ const posts = [
     time: "50m",
     likes: 2,
     replies: 2,
-    avatar: "https://via.placeholder.com/50",
+    avatar: "https://i.pinimg.com/736x/84/a7/fd/84a7fd755368a8f95263ff30f6179632.jpg",
     repliesData: [
       {
         id: "2-1",
@@ -53,7 +53,7 @@ const posts = [
         content: "Just a sec... 😂",
         time: "50m",
         likes: 0,
-        avatar: "https://via.placeholder.com/50",
+        avatar: "https://i.pinimg.com/736x/8e/31/96/8e3196dfb5ec71f62fee496fc6007a77.jpg",
       },
     ],
   },
@@ -178,7 +178,7 @@ export default function ProfileScreen() {
       <View style={styles.profileInfo}>
         <Avatar
           rounded
-          source={{ uri: "https://via.placeholder.com/80" }}
+          source={{ uri: "https://i.pinimg.com/736x/e9/f1/ac/e9f1ac1be3e35d62c72f2118af3da92d.jpg" }}
           size="large"
           containerStyle={styles.profileAvatar}
         />
@@ -203,13 +203,13 @@ export default function ProfileScreen() {
       <View style={styles.buttons}>
         <Button
           title="Edit profile"
-          buttonStyle={styles.button}
+          buttonStyle={styles.button_style}
           titleStyle={styles.buttonText}
           onPress={handleEditProfile}
         />
         <Button
           title="Share profile"
-          buttonStyle={styles.button}
+          buttonStyle={styles.button_style}
           titleStyle={styles.buttonText}
         />
       </View>
@@ -238,6 +238,28 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  buttons : {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    with : '100%'
+  },
+
+  button_style: {
+    backgroundColor: "white",
+    borderColor: "gray",
+    borderWidth: 0.5,
+    borderRadius: 8,
+    width: '80%',
+    paddingVertical: 5,
+  },
+  
+  buttonText: {
+    fontWeight: '100',
+    color: 'black',
+    textAlign: 'center',
+  },
+
   container: {
     flex: 1,
     backgroundColor: "#fff",

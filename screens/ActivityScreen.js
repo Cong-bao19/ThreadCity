@@ -16,7 +16,7 @@ const notifications = [
     username: "ma_dhoni",
     action: "followed you",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/d8/97/53/d897539843e94e4a8516fb2df0177161.jpg",
     followStatus: "Follow",
   },
   {
@@ -24,7 +24,7 @@ const notifications = [
     username: "ankurwarikoo",
     action: "followed you",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/bf/a7/08/bfa708caa12973ce5d3bb4859121ebbb.jpg",
     followStatus: "Follow",
   },
   {
@@ -32,7 +32,7 @@ const notifications = [
     username: "narendra_modi",
     action: "liked your photo",
     time: "3d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/81/13/11/811311b86edb1c5184c72c982023fb43.jpg",
     followStatus: "Follow",
   },
   {
@@ -40,7 +40,7 @@ const notifications = [
     username: "marendra_modi",
     action: "200k",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/57/46/01/5746011f96448dcc7f915e56e4115c7c.jpg",
     followStatus: "Follow",
   },
   {
@@ -48,7 +48,7 @@ const notifications = [
     username: "zuek",
     action: "liked your photo",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/a9/8e/cc/a98eccfe76055d13ce65ed89f8cdc938.jpg",
     followStatus: "Follow",
   },
   {
@@ -56,7 +56,7 @@ const notifications = [
     username: "zuek",
     action: "followed you",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/a9/8e/cc/a98eccfe76055d13ce65ed89f8cdc938.jpg",
     followStatus: "Follow",
   },
   {
@@ -64,7 +64,7 @@ const notifications = [
     username: "zuek",
     action: "liked your photo",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/a9/8e/cc/a98eccfe76055d13ce65ed89f8cdc938.jpg",
     followStatus: "Follow",
   },
   {
@@ -72,7 +72,7 @@ const notifications = [
     username: "elon_musk",
     action: "followed you",
     time: "2d",
-    avatar: "https://via.placeholder.com/40",
+    avatar: "https://i.pinimg.com/736x/ac/7e/03/ac7e03044fb7469b99a3190165ffb1c2.jpg",
     followStatus: "Follow",
   },
 ];

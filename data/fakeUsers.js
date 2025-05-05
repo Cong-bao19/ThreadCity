@@ -13,7 +13,7 @@ export default [
     username: "Ankur Warikoo",
     followers: "916k",
     verified: true,
-    avatar: "https://i.imgur.com/YG8LgYx.jpg",
+    avatar: "https://scontent.fdad3-5.fna.fbcdn.net/v/t39.30808-6/492225885_1853618918765106_4677459903094427795_n.jpg?stp=cp6_dst-jpg_tt6&_nc_cat=109&ccb=1-7&_nc_sid=94e2a3&_nc_eui2=AeGo8hRqpsFV3w3dGvmNoD59z0zw1qXJvZvPTPDWpcm9m9s0HgHyFl79ANvWWwy56swHfdZXCSUeC_khJX7g01CT&_nc_ohc=d2ben2TjiPUQ7kNvwEIYpdb&_nc_oc=AdmzeKhZmmEAd1vyk6mppoeM9tbHT3irU72IX5zXvDrnbUXaowWlsKs6KWjEyJ4B22T1ahspBrKkXYV58KBv2nXj&_nc_zt=23&_nc_ht=scontent.fdad3-5.fna&_nc_gid=rz2gYqzm2jTVuJNvKZnyKQ&oh=00_AfGziUCEkTLMNUqrRPcmdwLNrku9kVk014P3kslAAMhSZQ&oe=681445D2",
   },
   {
     id: "3",
@@ -21,7 +21,7 @@ export default [
     username: "Facebook",
     followers: "242k",
     verified: true,
-    avatar: "https://i.imgur.com/vPDb9DG.png",
+    avatar: "https://i.pinimg.com/736x/b1/9c/b7/b19cb7de38d8fa0424cf9717aade29d8.jpg",
   },
   {
     id: "4",
@@ -29,7 +29,7 @@ export default [
     username: "nbaclub",
     followers: "3.2M",
     verified: true,
-    avatar: "https://i.imgur.com/vsFwT1w.png",
+    avatar: "https://i.pinimg.com/736x/99/76/01/997601ff2e50374e90347a5aba290316.jpg",
   },
   {
     id: "5",
@@ -37,7 +37,7 @@ export default [
     username: "shakira",
     followers: "3.2M",
     verified: true,
-    avatar: "https://i.imgur.com/Aa2YQ3g.jpg",
+    avatar: "https://i.pinimg.com/736x/d5/8c/3c/d58c3c8e12c51a15ae5aae6192929c90.jpg",
   },
   {
     id: "6",
@@ -45,6 +45,6 @@ export default [
     username: "instagram",
     followers: "2.4M",
     verified: true,
-    avatar: "https://i.imgur.com/WCXAS94.png",
+    avatar: "https://i.pinimg.com/736x/93/87/90/938790b17acb5b3b8236d65ce8c4fc45.jpg",
   },
 ];
