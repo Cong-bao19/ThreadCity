@@ -20,86 +20,110 @@ const ActivityScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("ALL");
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
 
+  const fetchNotifications = async () => {
+    if (!user?.id) {
+      setError("User not found");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { data: notificationData, error: notificationError } =
+        await supabase
+          .from("notifications")
+          .select(
+            "id, type, created_at, is_read, actor_id, post_id, comment_id, content"
+          )
+          .eq("user_id", user.id) // Lấy tất cả thông báo của người dùng
+          .order("created_at", { ascending: false });
+
+      if (notificationError) throw notificationError;
+
+      const actorIds = [
+        ...new Set(notificationData.map((item) => item.actor_id)),
+      ];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .in("id", actorIds);
+
+      if (profilesError) throw profilesError;
+
+      const profileMap = new Map(
+        profilesData.map((profile) => [profile.id, profile])
+      );
+      const formattedNotifications = notificationData.map((item) => {
+        const username = profileMap.get(item.actor_id)?.username || "Unknown";
+        let action;
+        switch (item.type) {
+          case "like":
+            action = `${username} đã like bài viết của bạn`;
+            break;
+          case "comment":
+            action = `${username} đã bình luận bài viết của bạn`;
+            break;
+          case "follow":
+            action = `${username} đã theo dõi bạn`;
+            break;
+          case "reply":
+            action = `${username} đã phản hồi bình luận của bạn`;
+            break;
+          case "like cmt":
+            action = `${username} đã thích bình luận của bạn`;
+            break;
+          default:
+            action = item.content || "Thông báo không xác định";
+        }
+        return {
+          id: item.id,
+          username,
+          action,
+          time: calculateTimeAgo(item.created_at),
+          avatar:
+            profileMap.get(item.actor_id)?.avatar_url ||
+            "https://via.placeholder.com/40",
+          isRead: item.is_read,
+          type: item.type,
+          postId: item.post_id,
+          actorId: item.actor_id,
+        };
+      });
+      setNotifications(formattedNotifications);
+      setUnreadCount(
+        formattedNotifications.filter((item) => !item.isRead).length
+      );
+    } catch (err) {
+      setError(err.message);
+      console.error("Fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateNotificationReadStatus = async (notificationId) => {
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", notificationId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Error updating read status:", error);
+    } else {
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notificationId ? { ...item, isRead: true } : item
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+  };
+
   useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!user?.id) {
-        setError("User not found");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const { data: notificationData, error: notificationError } =
-          await supabase
-            .from("notifications")
-            .select(
-              "id, type, created_at, is_read, actor_id, post_id, comment_id, content"
-            )
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
-
-        if (notificationError) throw notificationError;
-
-        const actorIds = [
-          ...new Set(notificationData.map((item) => item.actor_id)),
-        ];
-        const { data: profilesData, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, username, avatar_url")
-          .in("id", actorIds);
-
-        if (profilesError) throw profilesError;
-
-        const profileMap = new Map(
-          profilesData.map((profile) => [profile.id, profile])
-        );
-        const formattedNotifications = notificationData.map((item) => {
-          const username = profileMap.get(item.actor_id)?.username || "Unknown";
-          let action;
-          switch (item.type) {
-            case "like":
-              action = `${username} đã like bài viết của bạn`;
-              break;
-            case "comment":
-              action = `${username} đã bình luận bài viết của bạn`;
-              break;
-            case "follow":
-              action = `${username} đã theo dõi bạn`;
-              break;
-            case "reply":
-              action = `${username} đã phản hồi bình luận của bạn`;
-              break;
-            case "like cmt":
-              action = `${username} đã thích bình luận của bạn`;
-              break;
-            default:
-              action = item.content || "Thông báo không xác định";
-          }
-          return {
-            id: item.id,
-            username,
-            action,
-            time: calculateTimeAgo(item.created_at),
-            avatar:
-              profileMap.get(item.actor_id)?.avatar_url ||
-              "https://via.placeholder.com/40",
-            followStatus: "Follow",
-            isRead: item.is_read,
-            type: item.type,
-            postId: item.post_id,
-          };
-        });
-        setNotifications(formattedNotifications);
-      } catch (err) {
-        setError(err.message);
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchNotifications();
   }, [user?.id]);
 
@@ -123,23 +147,42 @@ const ActivityScreen = () => {
     }
   });
 
-  const handleNotificationPress = (postId) => {
-    if (postId) {
-      router.push(`/thread/${postId}`); // Đổi route thành /thread/[postId]
+  const handleNotificationPress = async (notification) => {
+    if (notification.type === "follow") {
+      if (!notification.username) {
+        console.error("Username not found for actorId:", notification.actorId);
+        return;
+      }
+      await updateNotificationReadStatus(notification.id);
+      handleProfilePress(notification.username);
+    } else if (notification.postId) {
+      await updateNotificationReadStatus(notification.id);
+      router.push(`/thread/${notification.postId}`);
     }
   };
 
+  const handleProfilePress = (username) => {
+    router.push({
+      pathname: "/profile/[username]",
+      params: { username },
+    });
+  };
+
   const renderItem = ({ item }) => (
-    <TouchableOpacity onPress={() => handleNotificationPress(item.postId)}>
+    <TouchableOpacity onPress={() => handleNotificationPress(item)}>
       <View style={styles.notificationItem}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
         <View style={styles.notificationContent}>
-          <Text style={styles.notificationText}>{item.action}</Text>
+          <Text
+            style={[
+              styles.notificationText,
+              !item.isRead && styles.unreadText, // In đậm nếu chưa đọc
+            ]}
+          >
+            {item.action}
+          </Text>
           <Text style={styles.time}>{item.time}</Text>
         </View>
-        <TouchableOpacity style={styles.followButton}>
-          <Text style={styles.followButtonText}>{item.followStatus}</Text>
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -163,7 +206,22 @@ const ActivityScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Activity</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerText}>Activity</Text>
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={() => fetchNotifications()}
+        >
+          <Text style={styles.refreshButtonText}>Refresh</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.tabs}>
         <TouchableOpacity
@@ -234,8 +292,34 @@ const ActivityScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-  header: { paddingHorizontal: 16, paddingVertical: 10 },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   headerText: { fontSize: 24, fontWeight: "bold" },
+  badge: {
+    backgroundColor: "red",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  refreshButton: { padding: 5 },
+  refreshButtonText: { fontSize: 16, color: "#0000ff" },
   tabs: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -257,16 +341,8 @@ const styles = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   notificationContent: { flex: 1 },
   notificationText: { fontSize: 14 },
-  username: { fontWeight: "bold" },
+  unreadText: { fontWeight: "bold" }, // In đậm cho thông báo chưa đọc
   time: { fontSize: 12, color: "#666", marginTop: 2 },
-  followButton: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  followButtonText: { fontSize: 14, color: "#000", fontWeight: "bold" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { color: "red" },

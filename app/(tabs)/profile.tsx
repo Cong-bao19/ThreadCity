@@ -193,12 +193,25 @@ export default function ProfileScreen() {
         return acc;
       }, {});
 
+      const now = new Date(); // Sử dụng thời gian hiện tại
+
       const formattedPosts: Post[] = postsData.map((post: any) => {
         const createdAt = new Date(post.created_at);
-        const now = new Date("2025-04-27T18:30:00+00:00");
         const diffInMs = now.getTime() - createdAt.getTime();
         const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-        const time = diffInMinutes > 0 ? `${diffInMinutes}m` : "Just now";
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+        let time;
+        if (diffInDays > 0) {
+          time = `${diffInDays} Days ago`;
+        } else if (diffInHours > 0) {
+          time = `${diffInHours} Hours ago`;
+        } else if (diffInMinutes > 0) {
+          time = `${diffInMinutes} Minutes ago`;
+        } else {
+          time = "Just now";
+        }
 
         const postComments = commentsData.filter(
           (comment: any) => comment.post_id === post.id
@@ -221,10 +234,23 @@ export default function ProfileScreen() {
             const diffInMinutesComment = Math.floor(
               diffInMsComment / (1000 * 60)
             );
-            const timeComment =
-              diffInMinutesComment > 0
-                ? `${diffInMinutesComment}m`
-                : "Just now";
+            const diffInHoursComment = Math.floor(
+              diffInMsComment / (1000 * 60 * 60)
+            );
+            const diffInDaysComment = Math.floor(
+              diffInMsComment / (1000 * 60 * 60 * 24)
+            );
+
+            let timeComment;
+            if (diffInDaysComment > 0) {
+              timeComment = `${diffInDaysComment} Days ago`;
+            } else if (diffInHoursComment > 0) {
+              timeComment = `${diffInHoursComment} Hours ago`;
+            } else if (diffInMinutesComment > 0) {
+              timeComment = `${diffInMinutesComment} Minutes ago`;
+            } else {
+              timeComment = "Just now";
+            }
 
             return {
               id: comment.id,
@@ -281,12 +307,25 @@ export default function ProfileScreen() {
         return;
       }
 
+      const now = new Date(); // Sử dụng thời gian hiện tại
+
       const formattedReplies: Reply[] = commentsData.map((comment: any) => {
         const createdAt = new Date(comment.created_at);
-        const now = new Date("2025-04-27T18:30:00+00:00");
         const diffInMs = now.getTime() - createdAt.getTime();
         const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-        const time = diffInMinutes > 0 ? `${diffInMinutes}m` : "Just now";
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+        let time;
+        if (diffInDays > 0) {
+          time = `${diffInDays} Days ago`;
+        } else if (diffInHours > 0) {
+          time = `${diffInHours} Hours ago`;
+        } else if (diffInMinutes > 0) {
+          time = `${diffInMinutes} Minutes ago`;
+        } else {
+          time = "Just now";
+        }
 
         return {
           id: comment.id,

@@ -24,11 +24,16 @@ interface Profile {
 }
 
 // Fetch danh sách profile từ Supabase
-const fetchProfiles = async (): Promise<Profile[]> => {
+const fetchProfiles = async (
+  currentUserId: string | null
+): Promise<Profile[]> => {
+  if (!currentUserId) return [];
+
   const { data, error } = await supabase
     .from("profiles")
     .select("id, username, avatar_url, bio, is_private")
     .eq("is_private", false)
+    .neq("id", currentUserId) // Loại trừ người dùng hiện tại
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Error fetching profiles: ${error.message}`);
@@ -86,9 +91,10 @@ export default function SearchScreen() {
     isLoading,
     isError,
     error,
-  } = useQuery<Profile[], Error>({
-    queryKey: ["searchProfiles"],
-    queryFn: fetchProfiles,
+  } = useQuery({
+    queryKey: ["searchProfiles", currentUserId],
+    queryFn: () => fetchProfiles(currentUserId),
+    enabled: !!currentUserId, // Chỉ fetch khi có currentUserId
   });
 
   // Kiểm tra trạng thái follow khi profiles thay đổi
@@ -137,7 +143,9 @@ export default function SearchScreen() {
     },
     onSuccess: () => {
       // Refetch danh sách profiles để cập nhật số lượng followers
-      queryClient.invalidateQueries({ queryKey: ["searchProfiles"] });
+      queryClient.invalidateQueries({
+        queryKey: ["searchProfiles", currentUserId],
+      });
     },
     onError: (error: Error) => {
       console.error("Follow/Unfollow error:", error.message);
@@ -149,7 +157,10 @@ export default function SearchScreen() {
   };
 
   const handleProfilePress = (username: string) => {
-    router.push(`/profile/${username}`);
+    router.push({
+      pathname: "/profile/[username]",
+      params: { username },
+    });
   };
 
   const filteredProfiles =

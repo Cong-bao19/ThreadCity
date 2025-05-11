@@ -91,7 +91,7 @@ const fetchUserProfile = async (username: string): Promise<UserProfile> => {
 const fetchUserPosts = async (userId: string): Promise<Post[]> => {
   if (!userId) return [];
 
-  const now = new Date("2025-04-27T18:30:00+00:00");
+  const now = new Date();
 
   const { data: postsData, error: postsError } = await supabase
     .from("posts")
@@ -161,7 +161,19 @@ const fetchUserPosts = async (userId: string): Promise<Post[]> => {
     const createdAt = new Date(post.created_at);
     const diffInMs = now.getTime() - createdAt.getTime();
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    const time = diffInMinutes > 0 ? `${diffInMinutes}m` : "Just now";
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    let time;
+    if (diffInDays > 0) {
+      time = `${diffInDays} Days`;
+    } else if (diffInHours > 0) {
+      time = `${diffInHours} Hours`;
+    } else if (diffInMinutes > 0) {
+      time = `${diffInMinutes} Minutes`;
+    } else {
+      time = "Just now";
+    }
 
     const postComments = commentsData.filter(
       (comment: any) => comment.post_id === post.id
@@ -182,8 +194,23 @@ const fetchUserPosts = async (userId: string): Promise<Post[]> => {
         const commentTime = new Date(comment.created_at);
         const diffInMsComment = now.getTime() - commentTime.getTime();
         const diffInMinutesComment = Math.floor(diffInMsComment / (1000 * 60));
-        const timeComment =
-          diffInMinutesComment > 0 ? `${diffInMinutesComment}m` : "Just now";
+        const diffInHoursComment = Math.floor(
+          diffInMsComment / (1000 * 60 * 60)
+        );
+        const diffInDaysComment = Math.floor(
+          diffInMsComment / (1000 * 60 * 60 * 24)
+        );
+
+        let timeComment;
+        if (diffInDaysComment > 0) {
+          timeComment = `${diffInDaysComment}D`;
+        } else if (diffInHoursComment > 0) {
+          timeComment = `${diffInHoursComment}H`;
+        } else if (diffInMinutesComment > 0) {
+          timeComment = `${diffInMinutesComment}M`;
+        } else {
+          timeComment = "Just now";
+        }
 
         return {
           id: comment.id,
@@ -206,7 +233,7 @@ const fetchUserPosts = async (userId: string): Promise<Post[]> => {
 const fetchUserReplies = async (userId: string): Promise<any[]> => {
   if (!userId) return [];
 
-  const now = new Date("2025-04-27T18:30:00+00:00");
+  const now = new Date();
 
   const { data: commentsData, error: commentsError } = await supabase
     .from("comments")
@@ -240,7 +267,19 @@ const fetchUserReplies = async (userId: string): Promise<any[]> => {
     const createdAt = new Date(comment.created_at);
     const diffInMs = now.getTime() - createdAt.getTime();
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    const time = diffInMinutes > 0 ? `${diffInMinutes}m` : "Just now";
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    let time;
+    if (diffInDays > 0) {
+      time = `${diffInDays} Day`;
+    } else if (diffInHours > 0) {
+      time = `${diffInHours} Hours`;
+    } else if (diffInMinutes > 0) {
+      time = `${diffInMinutes} Minutes`;
+    } else {
+      time = "Just now";
+    }
 
     return {
       id: comment.id,
@@ -375,9 +414,10 @@ export default function ProfileScreen() {
       <View style={styles.postItem}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
         <View style={styles.postContent}>
-          <Text style={styles.username}>
-            {item.username} {item.time}
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.username}>{item.username}</Text>
+            <Text style={styles.timeText}>{item.time}</Text>
+          </View>
           <Text style={styles.content}>{item.content}</Text>
           <View style={styles.actions}>
             <TouchableOpacity>
@@ -588,9 +628,18 @@ const styles = StyleSheet.create({
   postContent: {
     flex: 1,
   },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   username: {
     fontWeight: "bold",
-    marginBottom: 4,
+  },
+  timeText: {
+    fontSize: 12,
+    color: "#666",
   },
   content: {
     fontSize: 14,
