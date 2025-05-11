@@ -96,7 +96,22 @@ const ActivityScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Activity</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerText}>Activity</Text>
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={() => fetchNotifications()}
+        >
+          <Text style={styles.refreshButtonText}>Refresh</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.tabs}>
         <TouchableOpacity style={[styles.tab, styles.activeTab]}>

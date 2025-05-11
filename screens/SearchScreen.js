@@ -20,6 +20,7 @@ const SearchScreen = () => {
   );
 
   const renderItem = ({ item }) => (
+
     <View style={styles.userRow}>
       <Image source={{ uri: item.avatar }} style={styles.avatar} />
       <View style={styles.info}>
@@ -97,5 +98,3 @@ const styles = StyleSheet.create({
   },
   followText: { color: "#000", fontWeight: "500" },
 });
-
-export default SearchScreen;

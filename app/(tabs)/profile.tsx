@@ -1,18 +1,18 @@
-// app/(tabs)/profile.tsx
+import { supabase } from "@/lib/supabase";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
   FlatList,
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Avatar, Divider } from "react-native-elements";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
 import Icon from "react-native-vector-icons/Ionicons";
-import { supabase } from "@/lib/supabase";
 
 // Định nghĩa interface cho bài đăng và bình luận
 interface Post {
@@ -24,6 +24,7 @@ interface Post {
   likes: number;
   replies: number;
   avatar: string;
+  userId: string;
   repliesData: Reply[];
 }
 
@@ -35,6 +36,7 @@ interface Reply {
   time: string;
   likes: number;
   avatar: string;
+  userId: string;
 }
 
 interface ProfileData {
@@ -42,17 +44,20 @@ interface ProfileData {
   avatar_url: string;
   bio: string;
   followersCount: number;
+  infor_url: string; // Đường dẫn QR code
 }
 
 export default function ProfileScreen() {
+  const { userId: targetUserId } = useLocalSearchParams();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"Threads" | "Replies">("Threads");
   const [loading, setLoading] = useState(true);
+  const [isQrModalVisible, setIsQrModalVisible] = useState(false); // State để điều khiển modal QR
 
-  // Lấy userId của người dùng hiện tại
+  // Lấy userId của người dùng hiện tại nếu không có targetUserId
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -62,8 +67,12 @@ export default function ProfileScreen() {
         setUserId(user.id);
       }
     };
-    fetchUser();
-  }, []);
+    if (!targetUserId) {
+      fetchUser();
+    } else {
+      setUserId(targetUserId as string);
+    }
+  }, [targetUserId]);
 
   // Tải thông tin hồ sơ và số lượng followers
   const fetchProfileData = async () => {
@@ -78,7 +87,7 @@ export default function ProfileScreen() {
 
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("username, avatar_url, bio")
+        .select("username, avatar_url, bio, infor_url")
         .eq("id", userId)
         .single();
 
@@ -102,6 +111,7 @@ export default function ProfileScreen() {
         avatar_url: profileData.avatar_url || "https://via.placeholder.com/80",
         bio: profileData.bio || "No bio available",
         followersCount: followersCount || 0,
+        infor_url: profileData.infor_url || "",
       });
     } catch (error) {
       console.error("Error:", error);
@@ -183,12 +193,25 @@ export default function ProfileScreen() {
         return acc;
       }, {});
 
+      const now = new Date(); // Sử dụng thời gian hiện tại
+
       const formattedPosts: Post[] = postsData.map((post: any) => {
         const createdAt = new Date(post.created_at);
-        const now = new Date("2025-04-27T18:30:00+00:00");
         const diffInMs = now.getTime() - createdAt.getTime();
         const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-        const time = diffInMinutes > 0 ? `${diffInMinutes}m` : "Just now";
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+        let time;
+        if (diffInDays > 0) {
+          time = `${diffInDays} Days ago`;
+        } else if (diffInHours > 0) {
+          time = `${diffInHours} Hours ago`;
+        } else if (diffInMinutes > 0) {
+          time = `${diffInMinutes} Minutes ago`;
+        } else {
+          time = "Just now";
+        }
 
         const postComments = commentsData.filter(
           (comment: any) => comment.post_id === post.id
@@ -196,6 +219,7 @@ export default function ProfileScreen() {
 
         return {
           id: post.id,
+          userId: post.user_id,
           username: profileData.username || "Unknown",
           handle: `@${profileData.username || "unknown"}`,
           content: post.content,
@@ -210,13 +234,27 @@ export default function ProfileScreen() {
             const diffInMinutesComment = Math.floor(
               diffInMsComment / (1000 * 60)
             );
-            const timeComment =
-              diffInMinutesComment > 0
-                ? `${diffInMinutesComment}m`
-                : "Just now";
+            const diffInHoursComment = Math.floor(
+              diffInMsComment / (1000 * 60 * 60)
+            );
+            const diffInDaysComment = Math.floor(
+              diffInMsComment / (1000 * 60 * 60 * 24)
+            );
+
+            let timeComment;
+            if (diffInDaysComment > 0) {
+              timeComment = `${diffInDaysComment} Days ago`;
+            } else if (diffInHoursComment > 0) {
+              timeComment = `${diffInHoursComment} Hours ago`;
+            } else if (diffInMinutesComment > 0) {
+              timeComment = `${diffInMinutesComment} Minutes ago`;
+            } else {
+              timeComment = "Just now";
+            }
 
             return {
               id: comment.id,
+              userId: comment.user_id,
               username: profile.username || "Unknown",
               handle: `@${profile.username || "unknown"}`,
               content: comment.content,
@@ -269,15 +307,29 @@ export default function ProfileScreen() {
         return;
       }
 
+      const now = new Date(); // Sử dụng thời gian hiện tại
+
       const formattedReplies: Reply[] = commentsData.map((comment: any) => {
         const createdAt = new Date(comment.created_at);
-        const now = new Date("2025-04-27T18:30:00+00:00");
         const diffInMs = now.getTime() - createdAt.getTime();
         const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-        const time = diffInMinutes > 0 ? `${diffInMinutes}m` : "Just now";
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+        let time;
+        if (diffInDays > 0) {
+          time = `${diffInDays} Days ago`;
+        } else if (diffInHours > 0) {
+          time = `${diffInHours} Hours ago`;
+        } else if (diffInMinutes > 0) {
+          time = `${diffInMinutes} Minutes ago`;
+        } else {
+          time = "Just now";
+        }
 
         return {
           id: comment.id,
+          userId: comment.user_id,
           username: profileData.username || "Unknown",
           handle: `@${profileData.username || "unknown"}`,
           content: comment.content,
@@ -304,19 +356,36 @@ export default function ProfileScreen() {
   }, [userId]);
 
   const handlePostPress = (postId: string) => {
-    router.push(`/thread?postId=${postId}`);
+    router.push(`/thread/${postId}`);
+  };
+
+  const handleProfilePress = (targetUserId: string) => {
+    router.push({
+      pathname: "/(tabs)/profile",
+      params: { userId: targetUserId },
+    });
+  };
+
+  const handleShareProfile = () => {
+    if (!profileData || !profileData.infor_url) {
+      console.error("No QR code URL available");
+      return;
+    }
+    setIsQrModalVisible(true); // Hiển thị modal khi bấm Share profile
   };
 
   const renderPost = ({ item }: { item: Post }) => (
     <TouchableOpacity onPress={() => handlePostPress(item.id)}>
       <View style={styles.threadItem}>
         <View style={styles.postHeader}>
-          <Avatar
-            rounded
-            source={{ uri: item.avatar }}
-            size="medium"
-            containerStyle={styles.avatar}
-          />
+          <TouchableOpacity onPress={() => handleProfilePress(item.userId)}>
+            <Avatar
+              rounded
+              source={{ uri: item.avatar }}
+              size="medium"
+              containerStyle={styles.avatar}
+            />
+          </TouchableOpacity>
           <View style={styles.postContent}>
             <View style={styles.postUser}>
               <Text style={styles.username}>{item.username}</Text>
@@ -353,12 +422,14 @@ export default function ProfileScreen() {
 
         {item.repliesData.map((reply) => (
           <View key={reply.id} style={styles.replyContainer}>
-            <Avatar
-              rounded
-              source={{ uri: reply.avatar }}
-              size="medium"
-              containerStyle={styles.avatar}
-            />
+            <TouchableOpacity onPress={() => handleProfilePress(reply.userId)}>
+              <Avatar
+                rounded
+                source={{ uri: reply.avatar }}
+                size="medium"
+                containerStyle={styles.avatar}
+              />
+            </TouchableOpacity>
             <View style={styles.postContent}>
               <View style={styles.postUser}>
                 <Text style={styles.username}>{reply.username}</Text>
@@ -399,12 +470,14 @@ export default function ProfileScreen() {
   const renderReply = ({ item }: { item: Reply }) => (
     <View style={styles.threadItem}>
       <View style={styles.postHeader}>
-        <Avatar
-          rounded
-          source={{ uri: item.avatar }}
-          size="medium"
-          containerStyle={styles.avatar}
-        />
+        <TouchableOpacity onPress={() => handleProfilePress(item.userId)}>
+          <Avatar
+            rounded
+            source={{ uri: item.avatar }}
+            size="medium"
+            containerStyle={styles.avatar}
+          />
+        </TouchableOpacity>
         <View style={styles.postContent}>
           <View style={styles.postUser}>
             <Text style={styles.username}>{item.username}</Text>
@@ -502,7 +575,7 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.button} onPress={handleEditProfile}>
           <Text style={styles.buttonText}>Edit profile</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={handleShareProfile}>
           <Text style={styles.buttonText}>Share profile</Text>
         </TouchableOpacity>
       </View>
@@ -555,6 +628,35 @@ export default function ProfileScreen() {
           style={styles.content}
         />
       )}
+
+      {/* Modal hiển thị QR code */}
+      <Modal
+        visible={isQrModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsQrModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Profile QR Code</Text>
+            {profileData.infor_url ? (
+              <Image
+                source={{ uri: profileData.infor_url }}
+                style={styles.qrImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.errorText}>QR code not available</Text>
+            )}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsQrModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -627,8 +729,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginHorizontal: 5,
     backgroundColor: "#f0f0f0",
-    justifyContent: "center", // Căn giữa nội dung theo chiều dọc
-    alignItems: "center", // Căn giữa nội dung theo chiều ngang
+    justifyContent: "center",
+    alignItems: "center",
   },
   buttonText: {
     color: "#000",
@@ -716,5 +818,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginTop: 10,
     marginLeft: 60,
+  },
+  // Styles cho modal QR code
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+    width: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  qrImage: {
+    width: 200,
+    height: 200,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: "red",
+    marginBottom: 20,
+  },
+  closeButton: {
+    backgroundColor: "#3897f0",
+    borderRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
 });
