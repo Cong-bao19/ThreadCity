@@ -1,0 +1,14 @@
+[33m7bcb12d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m, [m[1;31morigin/develop[m[33m)[m Merge pull request #13 from Cong-bao19/feature/search_post
+[33m99002bf[m[33m ([m[1;31morigin/feature/search_post[m[33m, [m[1;32mfeature/search_post[m[33m)[m Search post #11
+[33m8901b5d[m Merge branch 'refactor/ui-update-avatar-button-style' into develop
+[33m0e7091d[m[33m ([m[1;31morigin/refactor/ui-update-avatar-button-style[m[33m, [m[1;32mrefactor/ui-update-avatar-button-style[m[33m)[m refactor: update button styles and layout, add avatar image #12 please enter the commit message for your changes. Lines starting
+[33md0a1f6a[m[33m ([m[1;31morigin/feature/BE-Login-LoadHomePage-LoadDetailThread-CmtLike[m[33m, [m[1;32mfeature/BE-Login-LoadHomePage-LoadDetailThread-CmtLike[m[33m)[m #9 Done Login, HomePage, detailThread, like, cmt, profile, editprofile  BE Basic
+[33ma249738[m #9 Done Login, HomePage, detailThread, like, cmt  BE Basic
+[33mdce4b81[m Merge pull request #8 from Cong-bao19/feature/search-newthreadscreen
+[33m95180da[m[33m ([m[1;31morigin/feature/search-newthreadscreen[m[33m)[m #4 add new thread , seach screen
+[33m05f130c[m Merge pull request #5 from Cong-bao19/feature/editScreen-Activity
+[33ma3b6d20[m Merge pull request #6 from Cong-bao19/feature/profile
+[33m35ee500[m[33m ([m[1;31morigin/feature/2-Login-Homepage[m[33m)[m #2 Done Login, HomePage UI
+[33m0bf70e4[m[33m ([m[1;31morigin/feature/editScreen-Activity[m[33m)[m #3 - add Edit Screen and Activity UI
+[33m4682639[m[33m ([m[1;31morigin/feature/profile[m[33m)[m #1 - add profile screen
+[33m293720c[m[33m ([m[1;31morigin/master[m[33m)[m initial commit

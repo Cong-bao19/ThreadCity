@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Text, type TextProps, StyleSheet } from 'react-native';
+=======
+import { StyleSheet, Text, type TextProps } from 'react-native';
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
 
 import { useThemeColor } from '@/hooks/useThemeColor';
 

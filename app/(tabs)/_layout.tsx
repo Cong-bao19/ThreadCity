@@ -1,4 +1,5 @@
 // app/(tabs)/_layout.tsx
+<<<<<<< HEAD
 import React from "react";
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
@@ -9,6 +10,16 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { UserProvider } from "@/lib/UserContext";
 import { Image } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+=======
+import { HapticTab } from "@/components/HapticTab";
+import TabBarBackground from "@/components/ui/TabBarBackground";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { UserProvider } from "@/lib/UserContext";
+import { Tabs } from "expo-router";
+import React from "react";
+import { Image, Platform } from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -38,7 +49,11 @@ export default function TabLayout() {
           options={{
             title: "Home",
             tabBarIcon: ({ focused, color }) => {
+<<<<<<< HEAD
               const iconColor = focused ? 'black' : 'gray';
+=======
+              const iconColor = focused ? "black" : "gray";
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
               return <Icon name="home" size={24} color={iconColor} />;
             },
           }}
@@ -48,38 +63,67 @@ export default function TabLayout() {
           options={{
             title: "Search",
             tabBarIcon: ({ focused }) => {
+<<<<<<< HEAD
               const iconColor = focused ? 'black' : 'gray'
               return <Icon name="search" size={22} color={iconColor} />
             },
           }}
         />
  <Tabs.Screen
+=======
+              const iconColor = focused ? "black" : "gray";
+              return <Icon name="search" size={22} color={iconColor} />;
+            },
+          }}
+        />
+        <Tabs.Screen
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
           name="NewThread"
           options={{
             title: "New Thread",
             tabBarIcon: ({ focused, color }) => (
               <Image
+<<<<<<< HEAD
                 source={require('../../assets/images/addThread.png')}
                 style={{
                   width: 24,
                   height: 24,
                   tintColor: focused ? '#000' : '#666', // Đổi màu dựa trên focus
+=======
+                source={require("../../assets/images/addThread.png")}
+                style={{
+                  width: 24,
+                  height: 24,
+                  tintColor: focused ? "#000" : "#666",
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
                 }}
               />
             ),
           }}
         />
         <Tabs.Screen
+<<<<<<< HEAD
           name="Activity"
+=======
+          name="ActivityScreen"
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
           options={{
             title: "Activity",
             tabBarIcon: ({ focused, color }) => (
               <Image
+<<<<<<< HEAD
                 source={require('../../assets/images/heart.png')}
                 style={{
                   width: 22,
                   height: 22,
                   tintColor: focused ? '#000' : '#gray', // Đổi màu dựa trên focus
+=======
+                source={require("../../assets/images/heart.png")}
+                style={{
+                  width: 22,
+                  height: 22,
+                  tintColor: focused ? "#000" : "#gray",
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
                 }}
               />
             ),
@@ -91,6 +135,7 @@ export default function TabLayout() {
             title: "Profile",
             tabBarIcon: ({ focused, color }) => (
               <Image
+<<<<<<< HEAD
                 source={require('../../assets/images/person.png')}
                 style={{
                   width: 22,
@@ -106,6 +151,21 @@ export default function TabLayout() {
         <Tabs.Screen name="edit" options={{ href: null }} />
       </Tabs>
 
+=======
+                source={require("../../assets/images/person.png")}
+                style={{
+                  width: 22,
+                  height: 22,
+                  tintColor: focused ? "#000" : "#666",
+                }}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen name="explore" options={{ href: null }} />
+        <Tabs.Screen name="edit" options={{ href: null }} />
+      </Tabs>
+>>>>>>> 6522150e51172d1b9b726c9fc88ab56643dffb64
     </UserProvider>
   );
 }
