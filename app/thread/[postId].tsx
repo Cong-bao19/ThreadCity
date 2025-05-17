@@ -652,7 +652,11 @@ export default function Thread() {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
-            Error: {(error || (isError && error))?.message}
+            Error: {typeof error === "string"
+              ? error
+              : error && typeof error === "object" && "message" in error
+              ? (error as Error).message
+              : "An error occurred"}
           </Text>
         </View>
       </SafeAreaView>

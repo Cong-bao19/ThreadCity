@@ -1,7 +1,7 @@
 import { useUser } from "@/lib/UserContext";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   FlatList,
@@ -14,7 +14,6 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
-
 // Định nghĩa interface cho Post
 interface Post {
   id: string;
@@ -57,6 +56,7 @@ interface Tab {
   label: string;
   value: string;
 }
+
 
 // Fetch thông tin user từ Supabase
 const fetchUserProfile = async (username: string): Promise<UserProfile> => {
@@ -316,6 +316,7 @@ const checkFollowing = async (
 };
 
 export default function ProfileScreen() {
+  const navigation = useNavigation();
   const { username: rawUsername } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useUser();
@@ -370,6 +371,44 @@ export default function ProfileScreen() {
       checkFollowing(currentUserId, userProfile.id).then(setIsFollowing);
     }
   }, [userProfile?.id, currentUserId]);
+
+useEffect(() => {
+  if (userProfile?.username) {
+    navigation.setOptions({
+      title: "Quay lại",
+      headerTitleStyle: {
+        marginLeft: 0,
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#222",
+      },
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 6 }}>
+          <TouchableOpacity onPress={() => {/* TODO: Mở Instagram */}}>
+            <Image source={require("../../assets/images/instagram-logo.png")} style={{ width: 30, height: 24 }} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => {/* TODO: Xử lý thông báo */}}>
+            <Icon name="notifications-outline" size={22} color="#222" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {/* TODO: Hiện menu */}}
+            style={{
+              backgroundColor: '#eee',
+              borderRadius: 16,
+              width: 26,
+              height: 26,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Icon name="ellipsis-horizontal" size={18} color="#222" />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }
+}, [userProfile?.username, navigation]);
+
 
   const handleFollow = async () => {
     if (!currentUserId || !userProfile?.id) return;
@@ -461,6 +500,7 @@ export default function ProfileScreen() {
       </SafeAreaView>
     );
   }
+
 
   return (
     <SafeAreaView style={styles.container}>

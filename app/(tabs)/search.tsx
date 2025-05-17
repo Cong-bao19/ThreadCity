@@ -178,7 +178,7 @@ export default function SearchScreen() {
         <View style={styles.userRow}>
           <Image
             source={{
-              uri: item.avatar_url || "https://via.placeholder.com/50",
+              uri: item.avatar_url || "https://i.pinimg.com/736x/41/06/b3/4106b37e6f8483a756ab76fc1531af16.jpg",
             }}
             style={styles.avatar}
           />
