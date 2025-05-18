@@ -28,7 +28,7 @@ import styles from './profileStyles';
 import type { Post, UserProfile } from './profileTypes';
 
 // Fetch thông tin user từ Supabase
-const fetchUserProfile = async (username: string): Promise<UserProfile> => {
+export const fetchUserProfile = async (username: string): Promise<UserProfile> => {
   const { data, error } = await supabase
     .from("profiles")
     .select("id, username, avatar_url, bio, link, is_private, created_at")

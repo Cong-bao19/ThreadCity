@@ -123,7 +123,8 @@ describe('fetchPostAndComments', () => {
       });
 
       // Check comments
-      expect(result.comments).toHaveLength(2);    expect(result.comments[0]).toEqual({
+      expect(result.comments).toHaveLength(2);    
+      expect(result.comments[0]).toEqual({
         id: 'comment1',
         username: 'commenter1',
         avatar: 'https://example.com/avatar2.jpg',
@@ -153,7 +154,7 @@ describe('fetchPostAndComments', () => {
       expect(supabase.from).toHaveBeenCalledWith('likes');
       expect(supabase.from).toHaveBeenCalledWith('comments');
     } catch (error) {
-      console.error('Error in test:', error);
+      console.error('should format post data correctly \n >>> Caught error:', error.message);
     }
   });
 
