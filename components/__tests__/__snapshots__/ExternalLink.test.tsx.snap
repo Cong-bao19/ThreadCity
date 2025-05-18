@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ExternalLink renders correctly 1`] = `
+<View
+  href="https://example.com"
+  onPress={[Function]}
+  target="_blank"
+>
+  Example
+</View>
+`;

@@ -1,15 +1,18 @@
+import { useUser } from "@/lib/UserContext"; // Thêm useUser để lấy userId
+import { supabase } from "@/lib/supabase";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  StyleSheet,
   Text,
   TextInput,
-  FlatList,
-  StyleSheet,
-  Image,
   TouchableOpacity,
-  ActivityIndicator,
+  View,
 } from "react-native";
-import { supabase } from "@/lib/supabase";
 
 interface Profile {
   id: string;
@@ -17,95 +20,210 @@ interface Profile {
   avatar_url: string;
   bio: string;
   is_private: boolean;
+  followers: number; // Thêm followers để hiển thị số lượng người theo dõi
 }
+
+// Fetch danh sách profile từ Supabase
+const fetchProfiles = async (
+  currentUserId: string | null
+): Promise<Profile[]> => {
+  if (!currentUserId) return [];
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, avatar_url, bio, is_private")
+    .eq("is_private", false)
+    .neq("id", currentUserId) // Loại trừ người dùng hiện tại
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Error fetching profiles: ${error.message}`);
+
+  // Fetch số lượng followers cho từng profile
+  const profilesWithFollowers = await Promise.all(
+    data.map(async (profile: any) => {
+      const { count: followersCount, error: followersError } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", profile.id);
+
+      if (followersError)
+        throw new Error(`Error fetching followers: ${followersError.message}`);
+
+      return {
+        ...profile,
+        followers: followersCount || 0,
+      };
+    })
+  );
+
+  return profilesWithFollowers;
+};
+
+// Kiểm tra trạng thái follow
+const checkFollowing = async (
+  currentUserId: string | null,
+  profileId: string
+): Promise<boolean> => {
+  if (!currentUserId) return false;
+
+  const { data, error } = await supabase
+    .from("follows")
+    .select("*")
+    .eq("follower_id", currentUserId)
+    .eq("following_id", profileId)
+    .single();
+
+  if (error && error.code !== "PGRST116")
+    throw new Error(`Error checking follow: ${error.message}`);
+  return !!data;
+};
 
 export default function SearchScreen() {
   const [searchText, setSearchText] = useState("");
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [following, setFollowing] = useState<string[]>([]); // 🆕 danh sách follow
+  const { user } = useUser();
+  const currentUserId = user?.id || null;
+  const queryClient = useQueryClient();
+  const [following, setFollowing] = useState<{ [key: string]: boolean }>({}); // Lưu trạng thái follow cho từng profile
 
+  // Fetch danh sách profile
+  const {
+    data: profiles,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["searchProfiles", currentUserId],
+    queryFn: () => fetchProfiles(currentUserId),
+    enabled: !!currentUserId, // Chỉ fetch khi có currentUserId
+  });
+
+  // Kiểm tra trạng thái follow khi profiles thay đổi
   useEffect(() => {
-    fetchProfiles();
-  }, []);
+    if (profiles && currentUserId) {
+      const fetchFollowingStatus = async () => {
+        const followingStatus: { [key: string]: boolean } = {};
+        for (const profile of profiles) {
+          const isFollowing = await checkFollowing(currentUserId, profile.id);
+          followingStatus[profile.id] = isFollowing;
+        }
+        setFollowing(followingStatus);
+      };
+      fetchFollowingStatus();
+    }
+  }, [profiles, currentUserId]);
 
-  const fetchProfiles = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, bio, is_private")
-        .eq("is_private", false)
-        .order("created_at", { ascending: false });
+  // Mutation để xử lý follow/unfollow
+  const followMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      if (!currentUserId) throw new Error("User not logged in");
 
-      if (error) {
-        console.error("Error fetching profiles:", error);
-        return;
+      const isFollowing = following[userId];
+
+      if (isFollowing) {
+        const { error } = await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", currentUserId)
+          .eq("following_id", userId);
+
+        if (error) throw new Error(`Error unfollowing: ${error.message}`);
+      } else {
+        const { error } = await supabase
+          .from("follows")
+          .insert({ follower_id: currentUserId, following_id: userId });
+
+        if (error) throw new Error(`Error following: ${error.message}`);
       }
 
-      setProfiles(data || []);
-    } catch (error) {
-      console.error("Unexpected error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Cập nhật state cục bộ
+      setFollowing((prev) => ({
+        ...prev,
+        [userId]: !isFollowing,
+      }));
+    },
+    onSuccess: () => {
+      // Refetch danh sách profiles để cập nhật số lượng followers
+      queryClient.invalidateQueries({
+        queryKey: ["searchProfiles", currentUserId],
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Follow/Unfollow error:", error.message);
+    },
+  });
 
   const handleFollowToggle = (userId: string) => {
-    setFollowing((prev) => 
-      prev.includes(userId) 
-        ? prev.filter((id) => id !== userId) // nếu đang follow thì unfollow
-        : [...prev, userId] // nếu chưa follow thì follow
-    );
+    followMutation.mutate(userId);
   };
 
-  const filteredProfiles = searchText.trim() === ""
-    ? profiles
-    : profiles.filter((profile) =>
-        profile.username.toLowerCase().includes(searchText.toLowerCase())
-      );
+  const handleProfilePress = (username: string) => {
+    router.push({
+      pathname: "/profile/[username]",
+      params: { username },
+    });
+  };
+
+  const filteredProfiles =
+    searchText.trim() === ""
+      ? profiles || []
+      : (profiles || []).filter((profile) =>
+          profile.username.toLowerCase().includes(searchText.toLowerCase())
+        );
 
   const renderItem = ({ item }: { item: Profile }) => {
-    const isFollowing = following.includes(item.id);
+    const isFollowing = following[item.id] || false;
 
     return (
-      <View style={styles.userRow}>
-        <Image
-          source={{
-            uri: item.avatar_url || "https://via.placeholder.com/50",
-          }}
-          style={styles.avatar}
-        />
-        <View style={styles.info}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{item.username}</Text>
+      <TouchableOpacity onPress={() => handleProfilePress(item.username)}>
+        <View style={styles.userRow}>
+          <Image
+            source={{
+              uri: item.avatar_url || "https://i.pinimg.com/736x/41/06/b3/4106b37e6f8483a756ab76fc1531af16.jpg",
+            }}
+            style={styles.avatar}
+          />
+          <View style={styles.info}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{item.username}</Text>
+            </View>
+            <Text style={styles.bio} numberOfLines={1}>
+              {item.bio || "No bio"}
+            </Text>
+            <Text style={styles.followers}>{item.followers} followers</Text>
           </View>
-          <Text style={styles.bio} numberOfLines={1}>
-            {item.bio || "No bio"}
-          </Text>
+          <TouchableOpacity
+            style={[
+              styles.followButton,
+              { backgroundColor: isFollowing ? "#007aff" : "#fff" },
+            ]}
+            onPress={() => handleFollowToggle(item.id)}
+          >
+            <Text
+              style={[
+                styles.followText,
+                { color: isFollowing ? "#fff" : "#000" },
+              ]}
+            >
+              {isFollowing ? "Unfollow" : "Follow"}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.followButton,
-            { backgroundColor: isFollowing ? "#007aff" : "#fff" }, // 🆕 đổi màu nếu đã follow
-          ]}
-          onPress={() => handleFollowToggle(item.id)}
-        >
-          <Text style={[
-            styles.followText,
-            { color: isFollowing ? "#fff" : "#000" } // 🆕 đổi màu chữ
-          ]}>
-            {isFollowing ? "Unfollow" : "Follow"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007aff" />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>Error: {error.message}</Text>
       </View>
     );
   }
@@ -124,7 +242,9 @@ export default function SearchScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 100 }}
-        ListEmptyComponent={<Text style={styles.emptyText}>No users found</Text>}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No users found</Text>
+        }
       />
     </View>
   );
@@ -177,6 +297,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   bio: {
+    color: "#666",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  followers: {
     color: "#666",
     fontSize: 13,
     marginTop: 2,
