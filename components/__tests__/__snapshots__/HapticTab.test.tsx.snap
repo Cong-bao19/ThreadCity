@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`HapticTab renders correctly 1`] = `
+<View
+  onPressIn={[Function]}
+>
+  Test
+</View>
+`;

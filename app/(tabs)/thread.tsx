@@ -291,7 +291,7 @@ export default function Thread() {
   };
 
   const handleLike = async (id: string, isPost: boolean) => {
-    if (!userId) {
+    if (!id) {
       console.error("User not logged in");
       return;
     }

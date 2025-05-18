@@ -22,7 +22,7 @@ import {
 import Icon from "react-native-vector-icons/Ionicons";
 
 // Di chuyển hàm calculateTimeAgo ra ngoài để tái sử dụng
-const calculateTimeAgo = (createdAt: string): string => {
+export const calculateTimeAgo = (createdAt: string): string => {
   const now = new Date();
   const createdDate = new Date(createdAt);
   if (isNaN(createdDate.getTime())) return "Invalid date";
@@ -60,7 +60,7 @@ interface ThreadData {
   comments: Comment[];
 }
 
-const fetchPostAndComments = async (
+export const fetchPostAndComments = async (
   postId: string,
   userId: string
 ): Promise<ThreadData> => {
@@ -133,17 +133,22 @@ const fetchPostAndComments = async (
 
   if (commentsError)
     throw new Error(`Error fetching comments: ${commentsError.message}`);
-
   const userIds = commentsData.map((comment: any) => comment.user_id);
-  const { data: profilesData, error: profilesError } = await supabase
-    .from("profiles")
-    .select("id, username, avatar_url")
-    .in("id", userIds);
+  
+  let profilesData = [];
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, username, avatar_url")
+      .in("id", userIds);
 
-  if (profilesError)
-    throw new Error(
-      `Error fetching profiles for comments: ${profilesError.message}`
-    );
+    if (profilesError)
+      throw new Error(
+        `Error fetching profiles for comments: ${profilesError.message}`
+      );
+    
+    profilesData = profiles || [];
+  }
 
   const profilesMap = profilesData.reduce((acc: any, profile: any) => {
     acc[profile.id] = profile;
