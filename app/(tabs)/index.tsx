@@ -570,9 +570,19 @@ export default function HomeScreen() {
               <Icon name="heart-outline" size={18} color="#555" />
             )}
           </TouchableOpacity>
+          {item.likes > 0 && (
+            <Text style={styles.actionCount}>
+              {item.likes}
+            </Text>
+          )}
           <TouchableOpacity onPress={() => handleComment(item.id)} hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
             <Icon name="chatbubble-outline" size={18} color="#555" />
           </TouchableOpacity>
+          {item.replies > 0 && (
+            <Text style={styles.actionCount}>
+              {item.replies}
+            </Text>
+          )}
           <TouchableOpacity onPress={() => handleRepost(item.id)} hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
             {item.isReposted ? (
               <Icon name="repeat" size={18} color="#555" />
@@ -580,24 +590,16 @@ export default function HomeScreen() {
               <Icon name="repeat-outline" size={18} color="#555" />
             )}
           </TouchableOpacity>
+          {item.reposts > 0 && (
+            <Text style={styles.actionCount}>
+              {item.reposts}
+            </Text>
+          )}
           <TouchableOpacity hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
             <Icon name="paper-plane-outline" size={18} color="#555" />
           </TouchableOpacity>
         </View>
         
-        {item.likes > 0 && (
-          <Text style={styles.likeCount}>
-            {item.likes === 1 ? '1 like' : `${item.likes} likes`}
-          </Text>
-        )}
-        
-        {(item.replies > 0 || item.reposts > 0) && (
-          <Text style={styles.replyCount}>
-            {item.replies > 0 && (item.replies === 1 ? '1 reply' : `${item.replies} replies`)}
-            {item.replies > 0 && item.reposts > 0 ? ' · ' : ''}
-            {item.reposts > 0 && (item.reposts === 1 ? '1 repost' : `${item.reposts} reposts`)}
-          </Text>
-        )}
         {item.comments && Array.isArray(item.comments) && item.comments.length > 0 && (
           <View style={styles.commentsContainer}>
             {item.comments.map((comment, index) => 
@@ -914,5 +916,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
+  },
+  actionCount: {
+    fontSize: 14,
+    color: "#111",
   },
 });
