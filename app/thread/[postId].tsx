@@ -519,7 +519,7 @@ export default function Thread() {
     try {
       await Share.share({
         message: `${mainPost.content} - Shared from ${mainPost.username} (Post ID: ${mainPost.id})`,
-        url: `https://yourapp.com/thread/${mainPost.id}`, // Thay bằng URL thực tế
+        url: `https://thread.com/thread/${mainPost.id}`, // Thay bằng URL thực tế
       });
       const { data: actorProfile } = await supabase
         .from("profiles")

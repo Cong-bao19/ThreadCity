@@ -104,6 +104,7 @@ export default function TabLayout() {
         <Tabs.Screen name="explore" options={{ href: null }} />
         <Tabs.Screen name="thread" options={{ href: null }} />
         <Tabs.Screen name="edit" options={{ href: null }} />
+        <Tabs.Screen name="settings" options={{ href: null }} />
       </Tabs>
     </UserProvider>
   );

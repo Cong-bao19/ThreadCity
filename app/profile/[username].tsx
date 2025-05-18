@@ -1,11 +1,15 @@
 import { useUser } from "@/lib/UserContext";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Clipboard,
   FlatList,
   Image,
+  Modal,
+  Pressable,
   SafeAreaView,
   Share,
   StyleSheet,
@@ -13,56 +17,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import QRCode from 'react-native-qrcode-svg';
 import Icon from "react-native-vector-icons/Ionicons";
-// Định nghĩa interface cho Post
-interface Post {
-  id: string;
-  username: string;
-  handle: string;
-  content: string;
-  time: string;
-  likes: number;
-  replies: number;
-  avatar: string;
-  userId: string;
-  repliesData: Reply[];
-}
-
-// Định nghĩa interface cho Reply
-interface Reply {
-  id: string;
-  username: string;
-  handle: string;
-  content: string;
-  time: string;
-  likes: number;
-  avatar: string;
-  userId: string;
-}
-
-// Định nghĩa interface cho User Profile
-interface UserProfile {
-  id: string;
-  username: string;
-  avatar: string;
-  bio: string;
-  link: string;
-  is_private: boolean;
-  followers: number;
-}
-
-// Định nghĩa interface cho Tab
-interface Tab {
-  label: string;
-  value: string;
-}
-
+import ProfileButtons from './ProfileButtons';
+import ProfileHeader from './ProfileHeader';
+import ProfileInfo from './ProfileInfo';
+import ProfilePost from './ProfilePost';
+import ProfileTabs from './ProfileTabs';
+import styles from './profileStyles';
+import type { Post, UserProfile } from './profileTypes';
 
 // Fetch thông tin user từ Supabase
 const fetchUserProfile = async (username: string): Promise<UserProfile> => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, avatar_url, bio, link, is_private")
+    .select("id, username, avatar_url, bio, link, is_private, created_at")
     .eq("username", username)
     .single();
 
@@ -84,6 +53,7 @@ const fetchUserProfile = async (username: string): Promise<UserProfile> => {
     link: data.link || "",
     is_private: data.is_private || false,
     followers: followersCount || 0,
+    created_at: data.created_at,
   };
 };
 
@@ -328,8 +298,10 @@ export default function ProfileScreen() {
 
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState("Thread");
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [aboutVisible, setAboutVisible] = useState(false);
 
-  // Fetch thông tin user
   const {
     data: userProfile,
     isLoading: isUserLoading,
@@ -341,7 +313,6 @@ export default function ProfileScreen() {
     enabled: !!username,
   });
 
-  // Fetch danh sách bài đăng
   const {
     data: posts,
     isLoading: isPostsLoading,
@@ -353,7 +324,6 @@ export default function ProfileScreen() {
     enabled: !!userProfile?.id,
   });
 
-  // Fetch danh sách bình luận
   const {
     data: replies,
     isLoading: isRepliesLoading,
@@ -372,42 +342,42 @@ export default function ProfileScreen() {
     }
   }, [userProfile?.id, currentUserId]);
 
-useEffect(() => {
-  if (userProfile?.username) {
-    navigation.setOptions({
-      title: "Quay lại",
-      headerTitleStyle: {
-        marginLeft: 0,
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#222",
-      },
-      headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 6 }}>
-          <TouchableOpacity onPress={() => {/* TODO: Mở Instagram */}}>
-            <Image source={require("../../assets/images/instagram-logo.png")} style={{ width: 30, height: 24 }} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => {/* TODO: Xử lý thông báo */}}>
-            <Icon name="notifications-outline" size={22} color="#222" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {/* TODO: Hiện menu */}}
-            style={{
-              backgroundColor: '#eee',
-              borderRadius: 16,
-              width: 26,
-              height: 26,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Icon name="ellipsis-horizontal" size={18} color="#222" />
-          </TouchableOpacity>
-        </View>
-      ),
-    });
-  }
-}, [userProfile?.username, navigation]);
+  useEffect(() => {
+    if (userProfile?.username) {
+      navigation.setOptions({
+        title: "Quay lại",
+        headerTitleStyle: {
+          marginLeft: 0,
+          fontSize: 18,
+          fontWeight: "bold",
+          color: "#222",
+        },
+        headerRight: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 6 }}>
+            <TouchableOpacity onPress={() => {/* TODO: Mở Instagram */}}>
+              <Image source={require("../../assets/images/instagram-logo.png")} style={{ width: 30, height: 24 }} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {/* TODO: Xử lý thông báo */}}>
+              <Icon name="notifications-outline" size={22} color="#222" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setSettingsVisible(true)}
+              style={{
+                backgroundColor: '#eee',
+                borderRadius: 16,
+                width: 26,
+                height: 26,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Icon name="ellipsis-horizontal" size={18} color="#222" />
+            </TouchableOpacity>
+          </View>
+        ),
+      });
+    }
+  }, [userProfile?.username, navigation]);
 
 
   const handleFollow = async () => {
@@ -441,41 +411,30 @@ useEffect(() => {
     try {
       await Share.share({
         message: `${post.content} - Shared from ${post.handle} (Post ID: ${post.id})`,
-        url: `https://yourapp.com/thread/${post.id}`, // Thay bằng URL thực tế của ứng dụng
+        url: `https://thread.com/thread/${post.id}`, // Thay bằng URL thực tế của ứng dụng
       });
     } catch (error) {
       console.error("Error sharing:", error);
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <TouchableOpacity onPress={() => handlePostPress(item.id)}>
-      <View style={styles.postItem}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        <View style={styles.postContent}>
-          <View style={styles.headerRow}>
-            <Text style={styles.username}>{item.username}</Text>
-            <Text style={styles.timeText}>{item.time}</Text>
-          </View>
-          <Text style={styles.content}>{item.content}</Text>
-          <View style={styles.actions}>
-            <TouchableOpacity>
-              <Icon name="heart-outline" size={20} color="#666" />
-              <Text style={styles.actionText}>{item.likes}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Icon name="chatbubble-outline" size={20} color="#666" />
-              <Text style={styles.actionText}>{item.replies}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleShare(item)}>
-              <Icon name="share-outline" size={20} color="#666" />
-              <Text style={styles.actionText}>0</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleCopyLink = () => {
+    Clipboard.setString(profileLink);
+    setSettingsVisible(false);
+    // Optionally show a toast or alert
+  };
+
+  const handleShareProfile = async () => {
+    try {
+      await Share.share({
+        message: `Check out this profile: ${profileLink}`,
+        url: profileLink,
+      });
+    } catch (error) {
+      // Optionally handle error
+    }
+    setSettingsVisible(false);
+  };
 
   if (isUserLoading || isPostsLoading || isRepliesLoading) {
     return (
@@ -501,67 +460,19 @@ useEffect(() => {
     );
   }
 
+  const profileLink = `https://thread.com/profile/${userProfile?.username}`;
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.name}>{userProfile.username}</Text>
-        <Text style={styles.usernameText}>{userProfile.username}</Text>
-        <Image
-          source={{ uri: userProfile.avatar }}
-          style={styles.profileImage}
-        />
-      </View>
-      <View style={styles.info}>
-        <Text style={styles.location}>{userProfile.bio}</Text>
-        <Text style={styles.location}>{userProfile.link}</Text>
-        <Text style={styles.followers}>
-          {userProfile.followers} người theo dõi
-        </Text>
-      </View>
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: isFollowing ? "#ccc" : "#000" },
-          ]}
-          onPress={handleFollow}
-          disabled={userProfile.is_private && userProfile.id !== currentUserId}
-        >
-          <Text
-            style={[
-              styles.buttonText,
-              { color: isFollowing ? "#000" : "#fff" },
-            ]}
-          >
-            {isFollowing ? "Đang theo dõi" : "Theo dõi"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.messageButton]}>
-          <Text style={styles.buttonText}>Nhắn tin</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.tabs}>
-        <FlatList
-          data={[
-            { label: "Thread", value: "Thread" },
-            { label: "Thread trả lời", value: "Thread trả lời" },
-            { label: "File phương tiện", value: "File phương tiện" },
-            { label: "Bài đăng lại", value: "Bài đăng lại" },
-          ]}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.tab, activeTab === item.value && styles.activeTab]}
-              onPress={() => setActiveTab(item.value)}
-            >
-              <Text style={styles.tabText}>{item.label}</Text>
-            </TouchableOpacity>
-          )}
-          keyExtractor={(item) => item.value}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
+      <ProfileHeader username={userProfile.username} avatar={userProfile.avatar} />
+      <ProfileInfo bio={userProfile.bio} link={userProfile.link} followers={userProfile.followers} />
+      <ProfileButtons
+        isFollowing={isFollowing}
+        isPrivate={userProfile.is_private}
+        isCurrentUser={userProfile.id === currentUserId}
+        onFollow={handleFollow}
+      />
+      <ProfileTabs activeTab={activeTab} setActiveTab={setActiveTab} />
       <FlatList
         data={
           activeTab === "Thread"
@@ -570,129 +481,120 @@ useEffect(() => {
             ? replies
             : []
         }
-        renderItem={renderPost}
+        renderItem={({ item }: { item: Post }) => (
+          <ProfilePost item={item} onPress={handlePostPress} onShare={handleShare} />
+        )}
         keyExtractor={(item) => item.id}
         style={styles.postList}
       />
+      <Modal
+        visible={settingsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSettingsVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          {/* Blur/dim background */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSettingsVisible(false)}>
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' }} />
+          </Pressable>
+          {/* Bottom sheet modal */}
+          <View style={{
+            height: '60%',
+            backgroundColor: '#fff',
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            padding: 24,
+            elevation: 10,
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 40, height: 4, backgroundColor: '#ccc', borderRadius: 2, marginBottom: 12 }} />
+              <Text style={{ fontWeight: 'bold', fontSize: 18 }}>Cài đặt hồ sơ</Text>
+            </View>
+            <TouchableOpacity style={styles.settingItem} onPress={() => setShowQR(true)}>
+              <Icon name="qr-code-outline" size={22} color="#222" style={{ marginRight: 12 }} />
+              <Text style={styles.settingText}>Mã QR hồ sơ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem} onPress={handleCopyLink}>
+              <Icon name="link-outline" size={22} color="#222" style={{ marginRight: 12 }} />
+              <Text style={styles.settingText}>Sao chép liên kết hồ sơ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem} onPress={handleShareProfile}>
+              <Icon name="share-social-outline" size={22} color="#222" style={{ marginRight: 12 }} />
+              <Text style={styles.settingText}>Chia sẻ hồ sơ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={() => {
+                setSettingsVisible(false);
+                setTimeout(() => setAboutVisible(true), 300);
+              }}
+            >
+              <Icon name="settings-outline" size={22} color="#222" style={{ marginRight: 12 }} />
+              <Text style={styles.settingText}>Giới thiệu về trang cá nhân này</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem} onPress={() => { setSettingsVisible(false); /* TODO: Đăng xuất */ }}>
+              <Icon name="log-out-outline" size={22} color="red" style={{ marginRight: 12 }} />
+              <Text style={[styles.settingText, { color: 'red' }]}>Đăng xuất</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem} onPress={() => { setSettingsVisible(false); /* TODO: About/giới thiệu */ }}>
+              <Icon name="information-circle-outline" size={22} color="#222" style={{ marginRight: 12 }} />
+              <Text style={styles.settingText}>Giới thiệu</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem} onPress={() => setSettingsVisible(false)}>
+              <Icon name="close-outline" size={22} color="#222" style={{ marginRight: 12 }} />
+              <Text style={styles.settingText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+          {/* QR Code Modal */}
+          <Modal
+            visible={showQR}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowQR(false)}
+          >
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowQR(false)}>
+              <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+            </Pressable>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 32, alignItems: 'center', elevation: 10 }}>
+                <QRCode value={profileLink} size={180} />
+                <Text style={{ marginTop: 16, fontWeight: 'bold', fontSize: 16 }}>{userProfile.username}</Text>
+                <Text style={{ color: '#666', marginBottom: 12 }}>{profileLink}</Text>
+                <TouchableOpacity onPress={() => setShowQR(false)} style={{ marginTop: 8 }}>
+                  <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>Đóng</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </View>
+      </Modal>
+      {/* Đặt About Modal song song, không lồng trong Modal settings */}
+      <Modal
+        visible={aboutVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAboutVisible(false)}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setAboutVisible(false)}>
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+        </Pressable>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 32, alignItems: 'center', elevation: 10 }}>
+            <Icon name="information-circle-outline" size={40} color="#222" style={{ marginBottom: 12 }} />
+            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>{userProfile.username}</Text>
+            <Text style={{ color: '#666', marginBottom: 8 }}>
+              Ngày tham gia: {userProfile?.created_at ? new Date(userProfile.created_at).toLocaleDateString() : 'Không rõ'}
+            </Text>
+            <TouchableOpacity onPress={() => setAboutVisible(false)} style={{ marginTop: 8 }}>
+              <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginRight: 8,
-  },
-  usernameText: {
-    color: "#666",
-    marginRight: "auto",
-  },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  info: {
-    padding: 16,
-  },
-  location: {
-    fontSize: 16,
-  },
-  followers: {
-    fontSize: 14,
-    color: "#666",
-  },
-  buttons: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 4,
-  },
-  messageButton: {
-    backgroundColor: "#eee",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  buttonText: {
-    fontWeight: "bold",
-  },
-  tabs: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    marginBottom: 16,
-  },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: "#000",
-  },
-  tabText: {
-    fontSize: 16,
-  },
-  postList: {
-    flex: 1,
-  },
-  postItem: {
-    flexDirection: "row",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  postContent: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  username: {
-    fontWeight: "bold",
-  },
-  timeText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  content: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: 120,
-  },
-  actionText: {
-    fontSize: 12,
-    color: "#666",
-    marginLeft: 4,
-  },
-});
