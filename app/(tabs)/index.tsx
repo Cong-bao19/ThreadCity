@@ -31,7 +31,6 @@ interface Post {
 
 const fetchPosts = async (userId: string | null): Promise<Post[]> => {
   if (!userId) {
-    console.error("User not logged in");
     return [];
   }
 
@@ -132,8 +131,8 @@ export default function HomeScreen() {
   const { user } = useUser();
   const userId = user?.id || null;
   const [newPosts, setNewPosts] = useState<Post[]>([]);
-
   const queryClient = useQueryClient();
+
 
   // Query để fetch danh sách bài viết
   const { data, isLoading, isError, error, refetch } = useQuery<Post[], Error>({
@@ -226,6 +225,14 @@ export default function HomeScreen() {
       refetch(); // Refetch khi focus lại tab
     }, [userId])
   );
+
+    if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text>Loading user...</Text>
+      </SafeAreaView>
+    );
+  }
 
   const handleLike = (postId: string) => {
     if (!user) {
