@@ -88,7 +88,7 @@ const fetchUserProfile = async (username: string): Promise<UserProfile> => {
 };
 
 // Fetch danh sách bài đăng của user từ Supabase
-const fetchUserPosts = async (userId: string): Promise<Post[]> => {
+export const fetchUserPosts = async (userId: string): Promise<Post[]> => {
   if (!userId) return [];
 
   const now = new Date();
@@ -152,7 +152,7 @@ const fetchUserPosts = async (userId: string): Promise<Post[]> => {
       `Error fetching profiles for comments: ${commentProfilesError.message}`
     );
 
-  const profilesMap = commentProfilesData.reduce((acc: any, profile: any) => {
+  const profilesMap = (commentProfilesData || []).reduce((acc: any, profile: any) => {
     acc[profile.id] = profile;
     return acc;
   }, {});
