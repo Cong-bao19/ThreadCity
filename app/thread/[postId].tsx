@@ -1,3 +1,4 @@
+import React from "react";
 import { useUser } from "@/lib/UserContext";
 import { supabase } from "@/lib/supabase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -135,7 +136,7 @@ export const fetchPostAndComments = async (
     throw new Error(`Error fetching comments: ${commentsError.message}`);
   const userIds = commentsData.map((comment: any) => comment.user_id);
   
-  let profilesData = [];
+  let profilesData: { id: string; username: string; avatar_url: string }[] = [];
   if (userIds.length > 0) {
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
