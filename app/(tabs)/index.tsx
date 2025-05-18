@@ -31,6 +31,14 @@ interface Post {
   isLiked: boolean;
   reposts: number;
   isReposted: boolean;
+  comments: {
+    id: string;
+    userId: string;
+    username: string;
+    avatar: string;
+    content: string;
+    time: string;
+  }[];
 }
 
 const fetchPosts = async (userId: string | null): Promise<Post[]> => {
@@ -61,11 +69,49 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
     return [];
   }
 
-  const userIds = postsData.map((post: any) => post.user_id);
+  // Lấy tất cả các ID của posts để lấy thông tin chi tiết
+  const postIds = postsData.map((post: any) => post.id);
+
+  // Lấy top comment cho mỗi bài viết
+  const { data: commentsData, error: commentsError } = await supabase
+    .from("comments")
+    .select(`
+      id,
+      user_id,
+      post_id,
+      content,
+      created_at
+    `)
+    .in("post_id", postIds)
+    .order("created_at", { ascending: false });
+
+  if (commentsError) {
+    console.error("Error fetching comments:", commentsError);
+    return [];
+  }
+
+  // Nhóm comments theo post_id
+  const commentsByPostId: { [key: string]: any[] } = {};
+  commentsData.forEach((comment: any) => {
+    if (!commentsByPostId[comment.post_id]) {
+      commentsByPostId[comment.post_id] = [];
+    }
+    if (commentsByPostId[comment.post_id].length < 2) { // Chỉ lấy 2 comment mới nhất
+      commentsByPostId[comment.post_id].push(comment);
+    }
+  });
+
+  const userIds = [
+    ...postsData.map((post: any) => post.user_id),
+    ...commentsData.map((comment: any) => comment.user_id)
+  ];
+  // Loại bỏ các ID trùng lặp
+  const uniqueUserIds = [...new Set(userIds)];
+
   const { data: profilesData, error: profilesError } = await supabase
     .from("profiles")
     .select("id, username, avatar_url")
-    .in("id", userIds);
+    .in("id", uniqueUserIds);
 
   if (profilesError) {
     console.error("Error fetching profiles:", profilesError);
@@ -76,8 +122,6 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
     acc[profile.id] = profile;
     return acc;
   }, {});
-
-  const postIds = postsData.map((post: any) => post.id);
   
   // Kiểm tra likes
   const { data: likesData, error: likesError } = await supabase
@@ -108,6 +152,21 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
 
   const formattedPosts: Post[] = postsData.map((post: any) => {
     const profile = profilesMap[post.user_id] || {};
+    const postComments = commentsByPostId[post.id] || [];
+    
+    // Format comments
+    const formattedComments = postComments.map((comment: any) => {
+      const commentUserProfile = profilesMap[comment.user_id] || {};
+      return {
+        id: comment.id,
+        userId: comment.user_id,
+        username: commentUserProfile.username || "Unknown",
+        avatar: commentUserProfile.avatar_url || "https://via.placeholder.com/40",
+        content: comment.content,
+        time: formatTimeAgo(new Date(comment.created_at))
+      };
+    });
+
     return {
       id: post.id,
       userId: post.user_id,
@@ -115,12 +174,13 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
       avatar: profile.avatar_url || "https://via.placeholder.com/40",
       content: post.content,
       image: post.image_url,
-      time: new Date(post.created_at).toLocaleTimeString(),
+      time: formatTimeAgo(new Date(post.created_at)),
       replies: post.comments?.[0]?.count || 0,
       likes: post.likes?.[0]?.count || 0,
       isLiked: likedPostIds.has(post.id),
       reposts: post.reposts?.[0]?.count || 0,
       isReposted: repostedPostIds.has(post.id),
+      comments: formattedComments
     };
   });
 
@@ -155,6 +215,27 @@ const createNotification = async (
   }
 };
 
+// Format time to show like in the reference image (2h, 1m, etc.)
+const formatTimeAgo = (date: Date): string => {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  
+  // Convert to minutes, hours, days
+  const diffMin = Math.floor(diffMs / (1000 * 60));
+  const diffHr = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffDays > 0) {
+    return `${diffDays}d`;
+  } else if (diffHr > 0) {
+    return `${diffHr}h`;
+  } else if (diffMin > 0) {
+    return `${diffMin}m`;
+  } else {
+    return 'now';
+  }
+};
+
 export default function HomeScreen() {
   const { user } = useUser();
   const userId = user?.id || null;
@@ -183,70 +264,101 @@ export default function HomeScreen() {
   // Mutation cho like
   const likeMutation = useMutation({
     mutationFn: async (postId: string) => {
-      const { data: existingLike, error: likeError } = await supabase
-        .from("likes")
-        .select("id")
-        .eq("post_id", postId)
-        .eq("user_id", userId)
-        .single();
-
-      if (likeError && likeError.code !== "PGRST116") {
-        throw new Error(`Error checking like: ${likeError.message}`);
-      }
-
-      // Tìm bài viết để lấy thông tin userId (chủ bài viết)
+      // Find the post and check its current liked state
       const post = newPosts.find((p) => p.id === postId);
-      const postOwnerId = post?.userId;
+      if (!post) return null;
+      const postOwnerId = post.userId;
+      const isCurrentlyLiked = post.isLiked;
 
-      let actionPerformed = "";
-      if (existingLike) {
-        const { error: deleteError } = await supabase
+      // Immediately update UI optimistically
+      setNewPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+              }
+            : p
+        )
+      );
+
+      try {
+        const { data: existingLike, error: likeError } = await supabase
           .from("likes")
-          .delete()
-          .eq("id", existingLike.id);
-        if (deleteError)
-          throw new Error(`Error removing like: ${deleteError.message}`);
-        actionPerformed = "unlike";
-      } else {
-        const { error: insertError } = await supabase
-          .from("likes")
-          .insert({ post_id: postId, user_id: userId });
-        if (insertError)
-          throw new Error(`Error adding like: ${insertError.message}`);
-        actionPerformed = "like";
-      }
-
-      // Refetch dữ liệu sau khi like/unlike
-      await queryClient.refetchQueries({ queryKey: ["posts", userId] });
-
-      // Tạo thông báo nếu hành động là "like" và bài viết không phải của người dùng hiện tại
-      if (
-        actionPerformed === "like" &&
-        userId &&
-        postOwnerId &&
-        userId !== postOwnerId
-      ) {
-        const { data: actorProfile } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", userId)
+          .select("id")
+          .eq("post_id", postId)
+          .eq("user_id", userId)
           .single();
 
-        const actorUsername = actorProfile?.username || "Someone";
-        const notificationContent = `${actorUsername} liked your post`;
+        if (likeError && likeError.code !== "PGRST116") {
+          throw new Error(`Error checking like: ${likeError.message}`);
+        }
 
-        await createNotification(
-          postOwnerId,
-          userId,
-          postId,
-          null,
-          "like",
-          notificationContent
+        let actionPerformed = "";
+        if (existingLike) {
+          const { error: deleteError } = await supabase
+            .from("likes")
+            .delete()
+            .eq("id", existingLike.id);
+          if (deleteError)
+            throw new Error(`Error removing like: ${deleteError.message}`);
+          actionPerformed = "unlike";
+        } else {
+          const { error: insertError } = await supabase
+            .from("likes")
+            .insert({ post_id: postId, user_id: userId });
+          if (insertError)
+            throw new Error(`Error adding like: ${insertError.message}`);
+          actionPerformed = "like";
+        }
+
+        // Create notification if action is like and post is not by current user
+        if (
+          actionPerformed === "like" &&
+          userId &&
+          postOwnerId &&
+          userId !== postOwnerId
+        ) {
+          const { data: actorProfile } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", userId)
+            .single();
+
+          const actorUsername = actorProfile?.username || "Someone";
+          const notificationContent = `${actorUsername} liked your post`;
+
+          await createNotification(
+            postOwnerId,
+            userId,
+            postId,
+            null,
+            "like",
+            notificationContent
+          );
+        }
+        
+        return { postId, success: true };
+      } catch (error) {
+        // If there was an error, revert the optimistic update
+        setNewPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  isLiked: isCurrentlyLiked,
+                  likes: isCurrentlyLiked ? p.likes + 1 : p.likes - 1,
+                }
+              : p
+          )
         );
+        throw error;
       }
     },
     onError: (err) => {
       console.error("Like error:", err);
+      Alert.alert("Error", "Failed to update like status");
     },
   });
 
@@ -408,12 +520,24 @@ export default function HomeScreen() {
     <TouchableOpacity
       onPress={() => handleComment(item.id)}
       style={styles.postItem}
+      activeOpacity={0.7}
     >
-      <TouchableOpacity onPress={() => handleProfilePress(item.username)}>
+      <TouchableOpacity onPress={() => handleProfilePress(item.username)} style={styles.avatarContainer} activeOpacity={0.8}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        <View style={styles.verticalLine} />
       </TouchableOpacity>
       <View style={styles.postContent}>
-        <Text style={styles.username}>{item.username}</Text>
+        <View style={styles.postHeader}>
+          <View style={styles.userInfo}>
+            <Text style={styles.username} numberOfLines={1} ellipsizeMode="tail">{item.username}</Text>
+            <Text style={styles.dotSeparator}>·</Text>
+            <Text style={styles.time}>{item.time}</Text>
+          </View>
+          <TouchableOpacity onPress={() => handleMore(item.id)} hitSlop={{top: 10, right: 10, bottom: 10, left: 10}}>
+            <Icon name="ellipsis-horizontal" size={16} color="#888" />
+          </TouchableOpacity>
+        </View>
+        
         <Text style={styles.content}>
           {item.content.split(" ").map((word, index) =>
             word.startsWith("@") ? (
@@ -425,47 +549,79 @@ export default function HomeScreen() {
             )
           )}
         </Text>
+        
         {item.image && (
           <Image source={{ uri: item.image }} style={styles.postImage} />
         )}
+        
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => handleLike(item.id)}>
-            <Icon
-              name={item.isLiked ? "heart" : "heart-outline"}
-              size={20}
-              color={item.isLiked ? "#ff0000" : "#666"}
-            />
-            {item.likes > 0 && (
-              <Text style={styles.actionText}>{item.likes}</Text>
+          <TouchableOpacity onPress={() => handleLike(item.id)} hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
+            {item.isLiked ? (
+              <Icon name="heart" size={18} color="#ff3141" />
+            ) : (
+              <Icon name="heart-outline" size={18} color="#555" />
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleComment(item.id)}>
-            <Icon name="chatbubble-outline" size={20} color="#666" />
+          <TouchableOpacity onPress={() => handleComment(item.id)} hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
+            <Icon name="chatbubble-outline" size={18} color="#555" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleRepost(item.id)}>
-            <Icon
-              name={item.isReposted ? "repeat" : "repeat-outline"}
-              size={20}
-              color={item.isReposted ? "#00aa00" : "#666"}
-            />
-            {item.reposts > 0 && (
-              <Text style={styles.actionText}>{item.reposts}</Text>
+          <TouchableOpacity onPress={() => handleRepost(item.id)} hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
+            {item.isReposted ? (
+              <Icon name="repeat" size={18} color="#555" />
+            ) : (
+              <Icon name="repeat-outline" size={18} color="#555" />
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleMore(item.id)}>
-            <Icon name="ellipsis-horizontal" size={20} color="#666" />
+          <TouchableOpacity hitSlop={{top: 10, right: 5, bottom: 10, left: 5}}>
+            <Icon name="paper-plane-outline" size={18} color="#555" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.stats}>
-          {item.replies > 0 ? `${item.replies} replies` : ""}
-          {item.replies > 0 && (item.likes > 0 || item.reposts > 0) ? " • " : ""}
-          {item.likes > 0 ? `${item.likes} likes` : ""}
-          {item.likes > 0 && item.reposts > 0 ? " • " : ""}
-          {item.reposts > 0 ? `${item.reposts} reposts` : ""}
-        </Text>
+        
+        {item.likes > 0 && (
+          <Text style={styles.likeCount}>
+            {item.likes === 1 ? '1 like' : `${item.likes} likes`}
+          </Text>
+        )}
+        
+        {(item.replies > 0 || item.reposts > 0) && (
+          <Text style={styles.replyCount}>
+            {item.replies > 0 && (item.replies === 1 ? '1 reply' : `${item.replies} replies`)}
+            {item.replies > 0 && item.reposts > 0 ? ' · ' : ''}
+            {item.reposts > 0 && (item.reposts === 1 ? '1 repost' : `${item.reposts} reposts`)}
+          </Text>
+        )}
+        {item.comments && Array.isArray(item.comments) && item.comments.length > 0 && (
+          <View style={styles.commentsContainer}>
+            {item.comments.map((comment, index) => 
+              renderComment(comment, index, index === item.comments.length - 1)
+            )}
+          </View>
+        )}
       </View>
-      <Text style={styles.time}>{item.time}</Text>
     </TouchableOpacity>
+  );
+
+  const renderComment = (comment: any, index: number, isLastComment: boolean) => (
+    <View key={comment.id} style={styles.commentContainer}>
+      <TouchableOpacity onPress={() => handleProfilePress(comment.username)} style={styles.commentAvatarContainer}>
+        <Image source={{ uri: comment.avatar }} style={styles.commentAvatar} />
+        {!isLastComment && <View style={styles.commentVerticalLine} />}
+      </TouchableOpacity>
+      <View style={styles.commentContent}>
+        <View style={styles.commentHeader}>
+          <Text style={styles.commentUsername} numberOfLines={1} ellipsizeMode="tail">
+            {comment.username}
+          </Text>
+          <Text style={styles.commentTime}>{comment.time}</Text>
+        </View>
+        <Text style={styles.commentText} numberOfLines={2} ellipsizeMode="tail">
+          {comment.content}
+        </Text>
+        <View style={styles.commentActions}>
+          <Icon name="heart-outline" size={14} color="#888" />
+        </View>
+      </View>
+    </View>
   );
 
   if (isLoading) {
@@ -487,13 +643,18 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Home</Text>
+        <Image 
+          source={require('@/assets/images/logo.png')} 
+          style={styles.headerLogo} 
+          resizeMode="contain" 
+        />
       </View>
       <FlatList
         data={newPosts}
         renderItem={({ item }) => renderPostItem(item)}
         keyExtractor={(item) => item.id}
         style={styles.postList}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={() => refetch()} />
         }
@@ -528,31 +689,110 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  header: { padding: 16 },
-  headerText: { fontSize: 24, fontWeight: "bold" },
-  postList: { flex: 1 },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#fff" 
+  },
+  header: { 
+    paddingVertical: 14, 
+    alignItems: 'center',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#eeeeee'
+  },
+  headerLogo: {
+    width: 120,
+    height: 40,
+  },
+  postList: { 
+    flex: 1 
+  },
   postItem: {
     flexDirection: "row",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 8 },
-  postContent: { flex: 1 },
-  username: { fontWeight: "bold", marginBottom: 4 },
-  content: { marginBottom: 8 },
-  postImage: { width: "100%", height: 200, borderRadius: 8 },
-  actions: {
+  avatarContainer: {
+    alignItems: 'center',
+    width: 40,
+    marginRight: 4,
+  },
+  avatar: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18,
+    borderWidth: 0.5,
+    borderColor: '#e0e0e0',
+  },
+  verticalLine: {
+    position: "absolute",
+    top: 42,
+    bottom: -12,
+    left: 18,
+    width: 1.5,
+    backgroundColor: "#eeeeee",
+  },
+  postContent: { 
+    flex: 1,
+    paddingLeft: 8
+  },
+  postHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
-    marginBottom: 4,
+    alignItems: "center",
+    marginBottom: 2,
   },
-  actionText: { fontSize: 12, color: "#666", marginLeft: 4 },
-  mention: { color: "#007AFF" },
-  stats: { fontSize: 12, color: "#999" },
-  time: { fontSize: 10, color: "#aaa", alignSelf: "flex-end" },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  username: { 
+    fontWeight: "600", 
+    fontSize: 14
+  },
+  dotSeparator: {
+    fontSize: 14,
+    color: "#666",
+    marginHorizontal: 4,
+  },
+  time: { 
+    fontSize: 14, 
+    color: "#666"
+  },
+  content: { 
+    marginVertical: 6,
+    fontSize: 15,
+    lineHeight: 20,
+    color: "#111"
+  },
+  postImage: { 
+    width: "100%", 
+    height: 300, 
+    borderRadius: 10,
+    marginBottom: 8
+  },
+  actions: {
+    flexDirection: "row",
+    marginTop: 4,
+    gap: 16
+  },
+  mention: { 
+    color: "#1C9BF0" 
+  },
+  likeCount: {
+    fontSize: 14,
+    color: "#111",
+    marginTop: 6,
+  },
+  replyCount: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 2,
+  },
+  separator: {
+    height: 0.5,
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 16,
+  },
   
   // Modal styles
   modalOverlay: {
@@ -606,5 +846,65 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: "white",
     fontWeight: "600",
+  },
+  commentsContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: '#f0f0f0',
+  },
+  commentContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 10,
+    paddingLeft: 4,
+  },
+  commentAvatarContainer: {
+    width: 30,
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  commentAvatar: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: '#e0e0e0',
+  },
+  commentVerticalLine: {
+    position: "absolute",
+    top: 26,
+    bottom: -10,
+    left: 12,
+    width: 1,
+    backgroundColor: "#eee",
+  },
+  commentContent: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  commentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  commentUsername: {
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  commentText: {
+    fontSize: 13,
+    color: "#444",
+    lineHeight: 18,
+  },
+  commentTime: {
+    fontSize: 11,
+    color: "#888",
+  },
+  commentActions: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
   },
 });
