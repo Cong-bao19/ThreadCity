@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -9,8 +11,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert,
-  ActivityIndicator,
 } from "react-native";
 import { Avatar, Divider } from "react-native-elements";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -48,6 +48,7 @@ interface Reply {
 }
 
 interface ProfileData {
+  id: string; // Thêm id để xác định chủ tài khoản
   username: string;
   avatar_url: string;
   bio: string;
@@ -66,8 +67,9 @@ export default function ProfileScreen() {
   const [isQrModalVisible, setIsQrModalVisible] = useState(false); // State để điều khiển modal QR
   const [isDeleting, setIsDeleting] = useState(false); // State để kiểm soát trạng thái xóa
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isFollowing, setIsFollowing] = useState(false); // State để kiểm soát trạng thái follow
 
-  // Lấy userId của người dùng hiện tại nếu không có targetUserId
+  // Always get the logged-in userId on mount
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -75,19 +77,26 @@ export default function ProfileScreen() {
       } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
+        // console.log('Current logged in userId:', user.id);
       }
     };
-    if (!targetUserId) {
-      fetchUser();
-    } else {
-      setUserId(targetUserId as string);
+    fetchUser();
+  }, []);
+
+
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  useEffect(() => {
+    if (targetUserId) {
+      setProfileUserId(targetUserId as string);
+    } else if (userId) {
+      setProfileUserId(userId);
     }
-  }, [targetUserId]);
+  }, [targetUserId, userId]);
 
   // Tải thông tin hồ sơ và số lượng followers
   const fetchProfileData = async () => {
-    if (!userId) {
-      console.error("No userId provided");
+    if (!profileUserId) {
+      console.error("No profileUserId provided");
       setLoading(false);
       return;
     }
@@ -97,8 +106,8 @@ export default function ProfileScreen() {
 
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("username, avatar_url, bio, infor_url")
-        .eq("id", userId)
+        .select("id, username, avatar_url, bio, infor_url") // Thêm id vào select
+        .eq("id", profileUserId)
         .single();
 
       if (profileError) {
@@ -109,20 +118,32 @@ export default function ProfileScreen() {
       const { count: followersCount, error: followersError } = await supabase
         .from("follows")
         .select("*", { count: "exact", head: true })
-        .eq("following_id", userId);
+        .eq("following_id", profileUserId);
 
       if (followersError) {
         console.error("Error fetching followers count:", followersError);
         return;
       }
-
+      
       setProfileData({
+        id: profileData.id,
         username: profileData.username || "Unknown",
         avatar_url: profileData.avatar_url || "https://via.placeholder.com/80",
         bio: profileData.bio || "No bio available",
         followersCount: followersCount || 0,
         infor_url: profileData.infor_url || "",
       });
+
+      // Kiểm tra trạng thái follow sau khi tải xong dữ liệu hồ sơ
+      if (userId && profileData.id) {
+        const { data: follow, error } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', userId)
+          .eq('following_id', profileData.id)
+          .single();
+        setIsFollowing(!!follow);
+      }
     } catch (error) {
       console.error("Error:", error);
     }
@@ -130,7 +151,7 @@ export default function ProfileScreen() {
 
   // Tải danh sách bài đăng
   const fetchPosts = async () => {
-    if (!userId) return;
+    if (!profileUserId) return;
 
     try {
       setRefreshing(true);
@@ -149,7 +170,7 @@ export default function ProfileScreen() {
           likes (count)
         `
         )
-        .eq("user_id", userId)
+        .eq("user_id", profileUserId)
         .order("created_at", { ascending: false });
 
       if (postsError) {
@@ -176,7 +197,7 @@ export default function ProfileScreen() {
           )
         `
         )
-        .eq("user_id", userId)
+        .eq("user_id", profileUserId)
         .order("created_at", { ascending: false });
 
       if (repostsError) {
@@ -187,7 +208,7 @@ export default function ProfileScreen() {
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("username, avatar_url")
-        .eq("id", userId)
+        .eq("id", profileUserId)
         .single();
 
       if (profileError) {
@@ -531,13 +552,14 @@ export default function ProfileScreen() {
     }
   };
 
+  // In useEffect, fetch profile by profileUserId
   useEffect(() => {
-    if (userId) {
+    if (profileUserId) {
       fetchProfileData();
       fetchPosts();
       fetchReplies();
     }
-  }, [userId]);
+  }, [profileUserId]);
 
   const handlePostPress = (postId: string) => {
     router.push(`/thread/${postId}`);
@@ -857,7 +879,9 @@ export default function ProfileScreen() {
     );
   }
 
+  // console.log("profileData: " , profileData);
   if (!profileData) {
+    
     return (
       <SafeAreaView style={styles.container}>
         <Text>Profile not found</Text>
@@ -903,44 +927,133 @@ export default function ProfileScreen() {
       <Text style={styles.bio}>{profileData.bio}</Text>
 
       {/* Buttons */}
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.button} onPress={handleEditProfile}>
-          <Text style={styles.buttonText}>Edit profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleShareProfile}>
-          <Text style={styles.buttonText}>Share profile</Text>
-        </TouchableOpacity>
-      </View>
+      {userId === profileData.id ? (
+        <View style={styles.buttons}>
+          <TouchableOpacity style={styles.button} onPress={handleEditProfile}>
+            <Text style={styles.buttonText}>Edit profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={handleShareProfile}>
+            <Text style={styles.buttonText}>Share profile</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={{flexDirection: 'row', justifyContent: 'center', marginTop: 15, gap: 10}}>
+          <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: isFollowing ? '#fff' : '#000', // Đã follow: nền trắng, chưa follow: nền đen
+                  borderColor: '#000',
+                  flex: 1,
+                },
+              ]}
+            onPress={async () => {
+              if (!userId || !profileData?.id) {
+                console.log('Thiếu userId hoặc profileData.id', { userId, profileId: profileData?.id });
+                return;
+              }
+              try {
+                console.log('Bấm nút Follow/Unfollow:', { isFollowing, userId, profileId: profileData.id });
+                // Optimistic update
+                setIsFollowing((prev) => !prev);
+                setProfileData((prev) => prev ? {
+                  ...prev,
+                  followersCount: prev.followersCount + (isFollowing ? -1 : 1)
+                } : prev);
+                let apiError = null;
+                if (isFollowing) {
+                  // Unfollow
+                  const { data: existingFollow, error: selectErr } = await supabase
+                    .from('follows')
+                    .select('id')
+                    .eq('follower_id', userId)
+                    .eq('following_id', profileData.id)
+                    .single();
+                  console.log('Kết quả kiểm tra follow:', existingFollow, selectErr);
+                  if (existingFollow) {
+                    const { error: deleteErr } = await supabase.from('follows').delete().eq('id', existingFollow.id);
+                    console.log('Kết quả xoá follow:', deleteErr);
+                    apiError = deleteErr;
+                  }
+                } else {
+                  // Follow
+                  const { error: insertErr } = await supabase
+                    .from('follows')
+                    .insert({ follower_id: userId, following_id: profileData.id });
+                  console.log('Kết quả insert follow:', insertErr);
+                  apiError = insertErr;
+                }
+                if (apiError) {
+                  // Revert optimistic update
+                  setIsFollowing((prev) => !prev);
+                  setProfileData((prev) => prev ? {
+                    ...prev,
+                    followersCount: prev.followersCount + (isFollowing ? 1 : -1)
+                  } : prev);
+                  Alert.alert('Error', 'Follow error: ' + apiError.message);
+                }
+              } catch (err) {
+                // Revert optimistic update
+                setIsFollowing((prev) => !prev);
+                setProfileData((prev) => prev ? {
+                  ...prev,
+                  followersCount: prev.followersCount + (isFollowing ? 1 : -1)
+                } : prev);
+                console.error('Follow error:', err);
+                Alert.alert('Error', 'Follow error: ' + err);
+              }
+            }}
+          >
+             <Text style={[
+            styles.buttonText,
+            { color: isFollowing ? '#000' : '#fff' } // Đã follow: chữ đen, chưa follow: chữ trắng
+          ]}>
+            {isFollowing ? 'Unfollow' : 'Follow'}
+          </Text>
+          </TouchableOpacity>
+ <TouchableOpacity
+  style={[styles.button, {backgroundColor: '#fff', borderColor: '#000', flex: 1}]}
+  onPress={() => {
+    if (!profileData?.infor_url) return;
+    setIsQrModalVisible(true); // Hiển thị modal QR code
+  }}
+>
+  <Text style={[styles.buttonText, {color: '#000'}]}>QR Contact</Text>
+</TouchableOpacity>
+        </View>
+      )}
 
       {/* Navigation Tabs */}
       <View style={styles.navTabs}>
-        <TouchableOpacity
-          style={styles.navTab}
-          onPress={() => setActiveTab("Threads")}
-        >
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === "Threads" && styles.navTabActive,
-            ]}
-          >
-            Threads
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navTab}
-          onPress={() => setActiveTab("Replies")}
-        >
-          <Text
-            style={[
-              styles.navTabText,
-              activeTab === "Replies" && styles.navTabActive,
-            ]}
-          >
-            Replies
-          </Text>
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity
+    style={styles.navTab}
+    onPress={() => setActiveTab("Threads")}
+  >
+    <Text
+      style={[
+        styles.navTabText,
+        activeTab === "Threads" && styles.navTabActive,
+      ]}
+    >
+      Threads
+    </Text>
+    {activeTab === "Threads" && <View style={styles.underline} />}
+  </TouchableOpacity>
+  <TouchableOpacity
+    style={styles.navTab}
+    onPress={() => setActiveTab("Replies")}
+  >
+    <Text
+      style={[
+        styles.navTabText,
+        activeTab === "Replies" && styles.navTabActive,
+      ]}
+    >
+      Replies
+    </Text>
+    {activeTab === "Replies" && <View style={styles.underline} />}
+  </TouchableOpacity>
+</View>
 
       <Divider style={styles.divider} />
 
@@ -1072,7 +1185,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 5,
-    paddingVertical: 10,
+    paddingVertical: 8,
     marginHorizontal: 5,
     backgroundColor: "#f0f0f0",
     justifyContent: "center",
@@ -1087,21 +1200,39 @@ const styles = StyleSheet.create({
   navTabs: {
     flexDirection: "row",
     paddingHorizontal: 16,
-    marginTop: 15,
+    alignItems: "flex-end",
+    height: 38,
+    marginTop: 0,
+    justifyContent: "center",
   },
   navTab: {
-    marginRight: 20,
+    marginRight: 70, 
+    alignItems: "center",
+    justifyContent: "flex-end",
+    height: 38, // giống navTabs
   },
   navTabText: {
+    margin:10,
     fontSize: 16,
     color: "#666",
   },
   navTabActive: {
-    fontWeight: "bold",
+    fontWeight: "thin",
     color: "#000",
   },
+  underline: {
+    height: 3,
+    backgroundColor: "#000",
+    borderRadius: 2,
+    width: 70,
+    marginTop: 0,
+    marginBottom: -1,
+    alignSelf: "center",
+  },
   divider: {
-    marginVertical: 10,
+    height: 1,
+    backgroundColor: "#ddd",
+    marginVertical: 1,
   },
   content: {
     flex: 1,
