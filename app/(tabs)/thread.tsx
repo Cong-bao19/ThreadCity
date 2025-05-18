@@ -1,5 +1,6 @@
 // app/(tabs)/thread.tsx
-import React, { useEffect, useState, useRef } from "react";
+import React from 'react';
+import { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,

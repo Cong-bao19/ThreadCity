@@ -1,9 +1,10 @@
 // app/(tabs)/index.tsx
+import React from 'react';
 import { useUser } from "@/lib/UserContext";
 import { supabase } from "@/lib/supabase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   FlatList,
   Image,

@@ -1,6 +1,7 @@
+import React from 'react';
 import { supabase } from "@/lib/supabase";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FlatList,
   Image,
