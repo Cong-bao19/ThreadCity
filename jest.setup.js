@@ -49,6 +49,9 @@ jest.mock('expo-haptics', () => ({
   }
 }));
 
+// Mock cho react-native-vector-icons
+jest.mock('react-native-vector-icons/Ionicons', () => 'Icon');
+
 // Mock cho useThemeColor hook
 jest.mock('@/hooks/useThemeColor', () => ({
   useThemeColor: () => '#000000'
