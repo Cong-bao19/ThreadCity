@@ -43,7 +43,8 @@ export default function InstagramLogin() {
 
       if (data.user) {
         setUser(data.user);
-        console.log("Login success:", data);
+        console.log("User ID:", data.user.id);
+        console.log("Login success:", data.user);
         alert("Đăng nhập thành công");
         // Không cần router.replace("/") vì app/_layout.js sẽ xử lý điều hướng
       }

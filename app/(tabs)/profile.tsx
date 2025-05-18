@@ -9,6 +9,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Avatar, Divider } from "react-native-elements";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,6 +28,12 @@ interface Post {
   avatar: string;
   userId: string;
   repliesData: Reply[];
+  image_url?: string;
+  isRepost?: boolean;
+  repostedBy?: string;
+  repostedTime?: string;
+  repostedId?: string;
+  actualCreatedAt: Date; // Thời gian thực tế để sắp xếp (thời gian repost hoặc thời gian đăng bài)
 }
 
 interface Reply {
@@ -56,6 +64,8 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<"Threads" | "Replies">("Threads");
   const [loading, setLoading] = useState(true);
   const [isQrModalVisible, setIsQrModalVisible] = useState(false); // State để điều khiển modal QR
+  const [isDeleting, setIsDeleting] = useState(false); // State để kiểm soát trạng thái xóa
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   // Lấy userId của người dùng hiện tại nếu không có targetUserId
   useEffect(() => {
@@ -123,6 +133,9 @@ export default function ProfileScreen() {
     if (!userId) return;
 
     try {
+      setRefreshing(true);
+      
+      // Lấy bài đăng của người dùng
       const { data: postsData, error: postsError } = await supabase
         .from("posts")
         .select(
@@ -131,6 +144,7 @@ export default function ProfileScreen() {
           user_id,
           content,
           created_at,
+          image_url,
           comments (count),
           likes (count)
         `
@@ -140,6 +154,33 @@ export default function ProfileScreen() {
 
       if (postsError) {
         console.error("Error fetching posts:", postsError);
+        return;
+      }
+
+      // Lấy thông tin repost của người dùng
+      const { data: repostsData, error: repostsError } = await supabase
+        .from("reposts")
+        .select(
+          `
+          id,
+          post_id,
+          created_at,
+          posts (
+            id,
+            user_id,
+            content,
+            created_at,
+            image_url,
+            comments (count),
+            likes (count)
+          )
+        `
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (repostsError) {
+        console.error("Error fetching reposts:", repostsError);
         return;
       }
 
@@ -154,7 +195,37 @@ export default function ProfileScreen() {
         return;
       }
 
-      const postIds = postsData.map((post: any) => post.id);
+      // Lấy tất cả id bài viết để truy vấn comments
+      const ownPostIds = postsData.map((post: any) => post.id);
+      const repostPostIds = repostsData
+        .filter((repost: any) => repost.posts)
+        .map((repost: any) => repost.posts.id);
+
+      const allPostIds = [...ownPostIds, ...repostPostIds];
+
+      // Lấy ID của người dùng đã đăng bài repost
+      const repostedUserIds = repostsData
+        .filter((repost: any) => repost.posts)
+        .map((repost: any) => repost.posts.user_id);
+      
+      // Lấy profile của những người đã đăng bài repost
+      const { data: repostedProfiles, error: repostedProfilesError } = 
+        await supabase
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .in("id", repostedUserIds);
+      
+      if (repostedProfilesError) {
+        console.error("Error fetching profiles for reposts:", repostedProfilesError);
+        return;
+      }
+
+      const repostedProfilesMap = repostedProfiles.reduce((acc: any, profile: any) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {});
+
+      // Lấy comments cho tất cả các bài viết
       const { data: commentsData, error: commentsError } = await supabase
         .from("comments")
         .select(
@@ -168,7 +239,7 @@ export default function ProfileScreen() {
           likes (count)
         `
         )
-        .in("post_id", postIds)
+        .in("post_id", allPostIds)
         .is("parent_id", null)
         .order("created_at", { ascending: true });
 
@@ -195,7 +266,8 @@ export default function ProfileScreen() {
 
       const now = new Date(); // Sử dụng thời gian hiện tại
 
-      const formattedPosts: Post[] = postsData.map((post: any) => {
+      // Format bài đăng của người dùng
+      const formattedOwnPosts: Post[] = postsData.map((post: any) => {
         const createdAt = new Date(post.created_at);
         const diffInMs = now.getTime() - createdAt.getTime();
         const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
@@ -227,6 +299,9 @@ export default function ProfileScreen() {
           likes: post.likes?.[0]?.count || 0,
           replies: post.comments?.[0]?.count || 0,
           avatar: profileData.avatar_url || "https://via.placeholder.com/50",
+          image_url: post.image_url || undefined,
+          isRepost: false,
+          actualCreatedAt: createdAt, // Thời gian đăng bài thực tế
           repliesData: postComments.map((comment: any) => {
             const profile = profilesMap[comment.user_id] || {};
             const commentTime = new Date(comment.created_at);
@@ -266,9 +341,118 @@ export default function ProfileScreen() {
         };
       });
 
-      setPosts(formattedPosts);
+      // Format bài repost của người dùng
+      const formattedReposts: Post[] = repostsData
+        .filter((repost: any) => repost.posts) // Lọc các repost có dữ liệu bài viết
+        .map((repost: any) => {
+          const post = repost.posts;
+          const repostedUserId = post.user_id;
+          const repostedProfile = repostedProfilesMap[repostedUserId] || {};
+
+          const createdAt = new Date(post.created_at);
+          const diffInMs = now.getTime() - createdAt.getTime();
+          const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+          const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+          const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+          let time;
+          if (diffInDays > 0) {
+            time = `${diffInDays} Days ago`;
+          } else if (diffInHours > 0) {
+            time = `${diffInHours} Hours ago`;
+          } else if (diffInMinutes > 0) {
+            time = `${diffInMinutes} Minutes ago`;
+          } else {
+            time = "Just now";
+          }
+
+          // Thời gian repost
+          const repostCreatedAt = new Date(repost.created_at);
+          const repostDiffInMs = now.getTime() - repostCreatedAt.getTime();
+          const repostDiffInMinutes = Math.floor(repostDiffInMs / (1000 * 60));
+          const repostDiffInHours = Math.floor(repostDiffInMs / (1000 * 60 * 60));
+          const repostDiffInDays = Math.floor(repostDiffInMs / (1000 * 60 * 60 * 24));
+
+          let repostedTime;
+          if (repostDiffInDays > 0) {
+            repostedTime = `${repostDiffInDays} Days ago`;
+          } else if (repostDiffInHours > 0) {
+            repostedTime = `${repostDiffInHours} Hours ago`;
+          } else if (repostDiffInMinutes > 0) {
+            repostedTime = `${repostDiffInMinutes} Minutes ago`;
+          } else {
+            repostedTime = "Just now";
+          }
+
+          const postComments = commentsData.filter(
+            (comment: any) => comment.post_id === post.id
+          );
+
+          return {
+            id: post.id,
+            userId: post.user_id,
+            username: repostedProfile.username || "Unknown",
+            handle: `@${repostedProfile.username || "unknown"}`,
+            content: post.content,
+            time,
+            likes: post.likes?.[0]?.count || 0,
+            replies: post.comments?.[0]?.count || 0,
+            avatar: repostedProfile.avatar_url || "https://via.placeholder.com/50",
+            image_url: post.image_url || undefined,
+            isRepost: true,
+            repostedBy: profileData.username || "Unknown",
+            repostedTime,
+            repostedId: repost.id,
+            actualCreatedAt: repostCreatedAt, // Thời gian repost thực tế (không phải thời gian đăng bài gốc)
+            repliesData: postComments.map((comment: any) => {
+              const profile = profilesMap[comment.user_id] || {};
+              const commentTime = new Date(comment.created_at);
+              const diffInMsComment = now.getTime() - commentTime.getTime();
+              const diffInMinutesComment = Math.floor(
+                diffInMsComment / (1000 * 60)
+              );
+              const diffInHoursComment = Math.floor(
+                diffInMsComment / (1000 * 60 * 60)
+              );
+              const diffInDaysComment = Math.floor(
+                diffInMsComment / (1000 * 60 * 60 * 24)
+              );
+
+              let timeComment;
+              if (diffInDaysComment > 0) {
+                timeComment = `${diffInDaysComment} Days ago`;
+              } else if (diffInHoursComment > 0) {
+                timeComment = `${diffInHoursComment} Hours ago`;
+              } else if (diffInMinutesComment > 0) {
+                timeComment = `${diffInMinutesComment} Minutes ago`;
+              } else {
+                timeComment = "Just now";
+              }
+
+              return {
+                id: comment.id,
+                userId: comment.user_id,
+                username: profile.username || "Unknown",
+                handle: `@${profile.username || "unknown"}`,
+                content: comment.content,
+                time: timeComment,
+                likes: comment.likes?.[0]?.count || 0,
+                avatar: profile.avatar_url || "https://via.placeholder.com/50",
+              };
+            }),
+          };
+        });
+
+      // Kết hợp và sắp xếp tất cả bài viết theo thời gian thực tế (actualCreatedAt)
+      const allPosts = [...formattedOwnPosts, ...formattedReposts].sort((a, b) => {
+        return b.actualCreatedAt.getTime() - a.actualCreatedAt.getTime();
+      });
+
+      setPosts(allPosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -374,9 +558,130 @@ export default function ProfileScreen() {
     setIsQrModalVisible(true); // Hiển thị modal khi bấm Share profile
   };
 
+  // Hàm xử lý xóa bài viết
+  const handleDeletePost = async (postId: string, isRepost: boolean = false, repostId?: string) => {
+    if (!userId) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      if (isRepost && repostId) {
+        // Nếu là repost thì chỉ xóa repost không xóa bài gốc
+        const { error: deleteRepostError } = await supabase
+          .from("reposts")
+          .delete()
+          .eq("id", repostId);
+        
+        if (deleteRepostError) {
+          console.error("Error deleting repost:", deleteRepostError);
+          Alert.alert("Lỗi", "Không thể xóa repost");
+          return;
+        }
+      } else {
+        // Nếu là bài đăng gốc
+        // Xóa tất cả comments liên quan đến bài viết
+        const { error: commentsError } = await supabase
+          .from("comments")
+          .delete()
+          .eq("post_id", postId);
+        
+        if (commentsError) {
+          console.error("Error deleting comments:", commentsError);
+          Alert.alert("Lỗi", "Không thể xóa các bình luận của bài viết");
+          return;
+        }
+        
+        // Xóa tất cả likes liên quan đến bài viết
+        const { error: likesError } = await supabase
+          .from("likes")
+          .delete()
+          .eq("post_id", postId);
+        
+        if (likesError) {
+          console.error("Error deleting likes:", likesError);
+          Alert.alert("Lỗi", "Không thể xóa các lượt thích của bài viết");
+          return;
+        }
+
+        // Xóa tất cả reposts liên quan đến bài viết
+        const { error: repostsError } = await supabase
+          .from("reposts")
+          .delete()
+          .eq("post_id", postId);
+        
+        if (repostsError) {
+          console.error("Error deleting reposts:", repostsError);
+          Alert.alert("Lỗi", "Không thể xóa các lượt repost của bài viết");
+          return;
+        }
+        
+        // Xóa bài viết
+        const { error: postError } = await supabase
+          .from("posts")
+          .delete()
+          .eq("id", postId);
+        
+        if (postError) {
+          console.error("Error deleting post:", postError);
+          Alert.alert("Lỗi", "Không thể xóa bài viết");
+          return;
+        }
+      }
+      
+      // Cập nhật lại danh sách bài viết
+      setPosts(posts.filter(post => {
+        if (isRepost && repostId) {
+          return post.repostedId !== repostId;
+        } else {
+          return post.id !== postId;
+        }
+      }));
+      
+      Alert.alert("Thành công", isRepost ? "Đã bỏ repost bài viết" : "Bài viết đã được xóa");
+      
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      Alert.alert("Lỗi", "Có lỗi xảy ra khi xóa bài viết");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Hàm xử lý hiển thị dialog xác nhận xóa
+  const showDeleteConfirmation = (post: Post) => {
+    const message = post.isRepost 
+      ? "Bạn có chắc chắn muốn bỏ repost bài viết này không?"
+      : "Bạn có chắc chắn muốn xóa bài viết này không?";
+      
+    const actionText = post.isRepost ? "Bỏ repost" : "Xóa";
+    
+    Alert.alert(
+      "Xác nhận",
+      message,
+      [
+        {
+          text: "Hủy",
+          style: "cancel"
+        },
+        {
+          text: actionText,
+          onPress: () => handleDeletePost(post.id, post.isRepost, post.repostedId),
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
   const renderPost = ({ item }: { item: Post }) => (
     <TouchableOpacity onPress={() => handlePostPress(item.id)}>
       <View style={styles.threadItem}>
+        {item.isRepost && (
+          <View style={styles.repostHeader}>
+            <Icon name="repeat" size={14} color="#666" style={{marginRight: 5}} />
+            <Text style={styles.repostText}>{item.repostedBy} reposted</Text>
+            <Text style={styles.repostTime}> • {item.repostedTime}</Text>
+          </View>
+        )}
         <View style={styles.postHeader}>
           <TouchableOpacity onPress={() => handleProfilePress(item.userId)}>
             <Avatar
@@ -391,7 +696,10 @@ export default function ProfileScreen() {
               <Text style={styles.username}>{item.username}</Text>
               <Text style={styles.postHandle}>{item.handle}</Text>
               <Text style={styles.time}> • {item.time}</Text>
-              <TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showDeleteConfirmation(item)}
+                disabled={isDeleting}
+              >
                 <Icon
                   name="ellipsis-horizontal"
                   size={16}
@@ -401,6 +709,16 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
             <Text style={styles.threadText}>{item.content}</Text>
+            
+            {/* Hiển thị ảnh nếu có */}
+            {item.image_url && (
+              <Image 
+                source={{ uri: item.image_url }} 
+                style={styles.postImage}
+                resizeMode="cover"
+              />
+            )}
+
             <View style={styles.actions}>
               <TouchableOpacity style={styles.actionButton}>
                 <Icon name="heart-outline" size={20} color="#000" />
@@ -411,7 +729,7 @@ export default function ProfileScreen() {
                 <Text style={styles.actionText}>{item.replies}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
-                <Icon name="repeat-outline" size={20} color="#000" />
+                <Icon name={item.isRepost ? "repeat" : "repeat-outline"} size={20} color={item.isRepost ? "#00aa00" : "#000"} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
                 <Icon name="share-outline" size={20} color="#000" />
@@ -517,10 +835,24 @@ export default function ProfileScreen() {
     router.push("/edit");
   };
 
+  // Handle refresh when pulling down the FlatList
+  const handleRefresh = () => {
+    setRefreshing(true);
+    if (userId) {
+      fetchProfileData();
+      fetchPosts();
+      fetchReplies();
+    }
+    setRefreshing(false);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Loading...</Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -617,8 +949,15 @@ export default function ProfileScreen() {
         <FlatList
           data={posts}
           renderItem={renderPost}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => (item.isRepost ? `repost-${item.repostedId}` : item.id)}
           style={styles.content}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No threads yet</Text>
+            </View>
+          }
         />
       ) : (
         <FlatList
@@ -626,6 +965,13 @@ export default function ProfileScreen() {
           renderItem={renderReply}
           keyExtractor={(item) => item.id}
           style={styles.content}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No replies yet</Text>
+            </View>
+          }
         />
       )}
 
@@ -856,5 +1202,46 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  repostHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    marginLeft: 58,
+  },
+  repostText: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+  },
+  repostTime: {
+    fontSize: 12,
+    color: "#888",
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
