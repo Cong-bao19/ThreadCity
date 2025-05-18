@@ -267,7 +267,7 @@ export const fetchUserReplies = async (userId: string): Promise<any[]> => {
 };
 
 // Kiểm tra trạng thái follow
-const checkFollowing = async (
+export const checkFollowing = async (
   currentUserId: string | null,
   profileId: string
 ): Promise<boolean> => {
