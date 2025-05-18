@@ -200,7 +200,7 @@ export const fetchUserPosts = async (userId: string): Promise<Post[]> => {
 };
 
 // Fetch danh sách bình luận của user (cho tab Replies)
-const fetchUserReplies = async (userId: string): Promise<any[]> => {
+export const fetchUserReplies = async (userId: string): Promise<any[]> => {
   if (!userId) return [];
 
   const now = new Date();
