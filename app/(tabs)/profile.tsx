@@ -1025,35 +1025,35 @@ export default function ProfileScreen() {
 
       {/* Navigation Tabs */}
       <View style={styles.navTabs}>
-  <TouchableOpacity
-    style={styles.navTab}
-    onPress={() => setActiveTab("Threads")}
-  >
-    <Text
-      style={[
-        styles.navTabText,
-        activeTab === "Threads" && styles.navTabActive,
-      ]}
-    >
-      Threads
-    </Text>
-    {activeTab === "Threads" && <View style={styles.underline} />}
-  </TouchableOpacity>
-  <TouchableOpacity
-    style={styles.navTab}
-    onPress={() => setActiveTab("Replies")}
-  >
-    <Text
-      style={[
-        styles.navTabText,
-        activeTab === "Replies" && styles.navTabActive,
-      ]}
-    >
-      Replies
-    </Text>
-    {activeTab === "Replies" && <View style={styles.underline} />}
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity
+          style={styles.navTab}
+          onPress={() => setActiveTab("Threads")}
+        >
+          <Text
+            style={[
+              styles.navTabText,
+              activeTab === "Threads" && styles.navTabActive,
+            ]}
+          >
+            Threads
+          </Text>
+          {activeTab === "Threads" && <View style={styles.underline} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navTab}
+          onPress={() => setActiveTab("Replies")}
+        >
+          <Text
+            style={[
+              styles.navTabText,
+              activeTab === "Replies" && styles.navTabActive,
+            ]}
+          >
+            Replies
+          </Text>
+          {activeTab === "Replies" && <View style={styles.underline} />}
+        </TouchableOpacity>
+      </View>
 
       <Divider style={styles.divider} />
 
@@ -1203,16 +1203,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     height: 38,
     marginTop: 0,
-    justifyContent: "center",
+    justifyContent: "space-between", 
   },
   navTab: {
-    marginRight: 70, 
+    flex: 1, 
     alignItems: "center",
     justifyContent: "flex-end",
-    height: 38, // giống navTabs
+    height: 38,
+    marginRight: 0,
   },
   navTabText: {
-    margin:10,
+    margin: 10,
     fontSize: 16,
     color: "#666",
   },
