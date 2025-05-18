@@ -13,6 +13,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
+  Modal,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 
@@ -27,6 +29,8 @@ interface Post {
   replies: number;
   likes: number;
   isLiked: boolean;
+  reposts: number;
+  isReposted: boolean;
 }
 
 const fetchPosts = async (userId: string | null): Promise<Post[]> => {
@@ -35,6 +39,7 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
     return [];
   }
 
+  // Lấy tất cả bài posts gốc
   const { data: postsData, error: postsError } = await supabase
     .from("posts")
     .select(
@@ -45,7 +50,8 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
       created_at,
       image_url,
       comments (count),
-      likes (count)
+      likes (count),
+      reposts (count)
     `
     )
     .order("created_at", { ascending: false });
@@ -72,6 +78,8 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
   }, {});
 
   const postIds = postsData.map((post: any) => post.id);
+  
+  // Kiểm tra likes
   const { data: likesData, error: likesError } = await supabase
     .from("likes")
     .select("post_id")
@@ -83,7 +91,20 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
     return [];
   }
 
+  // Kiểm tra reposts
+  const { data: repostsData, error: repostsError } = await supabase
+    .from("reposts")
+    .select("post_id")
+    .eq("user_id", userId)
+    .in("post_id", postIds);
+
+  if (repostsError) {
+    console.error("Error checking repost status for posts:", repostsError);
+    return [];
+  }
+
   const likedPostIds = new Set(likesData.map((like: any) => like.post_id));
+  const repostedPostIds = new Set(repostsData.map((repost: any) => repost.post_id));
 
   const formattedPosts: Post[] = postsData.map((post: any) => {
     const profile = profilesMap[post.user_id] || {};
@@ -98,6 +119,8 @@ const fetchPosts = async (userId: string | null): Promise<Post[]> => {
       replies: post.comments?.[0]?.count || 0,
       likes: post.likes?.[0]?.count || 0,
       isLiked: likedPostIds.has(post.id),
+      reposts: post.reposts?.[0]?.count || 0,
+      isReposted: repostedPostIds.has(post.id),
     };
   });
 
@@ -110,21 +133,25 @@ const createNotification = async (
   actorId: string, // Người thực hiện hành động (người dùng hiện tại)
   postId: string, // ID bài viết
   commentId: string | null, // ID comment (dùng cho reply)
-  type: "like" | "comment" | "share" | "reply", // Loại hành động
+  type: "like" | "comment" | "follow" | "reply" | "like cmt", // Loại hành động hỗ trợ trong bảng notifications
   content: string // Nội dung thông báo
 ) => {
-  const { error } = await supabase.from("notifications").insert({
-    user_id: userId,
-    actor_id: actorId,
-    post_id: postId,
-    comment_id: commentId,
-    type: type,
-    content: content,
-    is_read: false,
-  });
+  try {
+    const { error } = await supabase.from("notifications").insert({
+      user_id: userId,
+      actor_id: actorId,
+      post_id: postId,
+      comment_id: commentId,
+      type: type,
+      content: content,
+      is_read: false,
+    });
 
-  if (error) {
-    console.error(`Error creating ${type} notification:`, error);
+    if (error) {
+      console.error(`Error creating ${type} notification:`, error);
+    }
+  } catch (error) {
+    console.error("Unexpected error creating notification:", error);
   }
 };
 
@@ -132,6 +159,8 @@ export default function HomeScreen() {
   const { user } = useUser();
   const userId = user?.id || null;
   const [newPosts, setNewPosts] = useState<Post[]>([]);
+  const [repostModalVisible, setRepostModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -221,6 +250,77 @@ export default function HomeScreen() {
     },
   });
 
+  // Mutation cho repost
+  const repostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const { data: existingRepost, error: repostError } = await supabase
+        .from("reposts")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", userId)
+        .single();
+
+      if (repostError && repostError.code !== "PGRST116") {
+        throw new Error(`Error checking repost: ${repostError.message}`);
+      }
+
+      // Tìm bài viết để lấy thông tin userId (chủ bài viết)
+      const post = newPosts.find((p) => p.id === postId);
+      const postOwnerId = post?.userId;
+
+      let actionPerformed = "";
+      if (existingRepost) {
+        const { error: deleteError } = await supabase
+          .from("reposts")
+          .delete()
+          .eq("id", existingRepost.id);
+        if (deleteError)
+          throw new Error(`Error removing repost: ${deleteError.message}`);
+        actionPerformed = "unrepost";
+      } else {
+        const { error: insertError } = await supabase
+          .from("reposts")
+          .insert({ post_id: postId, user_id: userId });
+        if (insertError)
+          throw new Error(`Error adding repost: ${insertError.message}`);
+        actionPerformed = "repost";
+      }
+
+      // Refetch dữ liệu sau khi repost/unrepost
+      await queryClient.refetchQueries({ queryKey: ["posts", userId] });
+
+      // Tạo thông báo nếu hành động là "repost" và bài viết không phải của người dùng hiện tại
+      if (
+        actionPerformed === "repost" &&
+        userId &&
+        postOwnerId &&
+        userId !== postOwnerId
+      ) {
+        const { data: actorProfile } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", userId)
+          .single();
+
+        const actorUsername = actorProfile?.username || "Someone";
+        const notificationContent = `${actorUsername} reposted your post`;
+
+        // Sử dụng loại "comment" thay vì "repost" vì "repost" không được hỗ trợ
+        await createNotification(
+          postOwnerId,
+          userId,
+          postId,
+          null,
+          "comment", // Thay đổi từ "repost" sang "comment" hoặc một loại được hỗ trợ khác
+          notificationContent
+        );
+      }
+    },
+    onError: (err) => {
+      console.error("Repost error:", err);
+    },
+  });
+
   useFocusEffect(
     React.useCallback(() => {
       refetch(); // Refetch khi focus lại tab
@@ -270,38 +370,27 @@ export default function HomeScreen() {
     router.push(`/thread/${postId}`);
   };
 
-  const handleShare = async (postId: string) => {
+  const handleRepost = (postId: string) => {
     if (!user) {
-      alert("Please log in to share a post.");
+      Alert.alert("Please log in to repost.");
       return;
     }
-
-    // Tìm bài viết để lấy thông tin userId (chủ bài viết)
-    const post = newPosts.find((p) => p.id === postId);
-    const postOwnerId = post?.userId;
-
-    // Tạo thông báo nếu bài viết không phải của người dùng hiện tại
-    if (userId && postOwnerId && userId !== postOwnerId) {
-      const { data: actorProfile } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", userId)
-        .single();
-
-      const actorUsername = actorProfile?.username || "Someone";
-      const notificationContent = `${actorUsername} shared your post`;
-
-      await createNotification(
-        postOwnerId,
-        userId,
-        postId,
-        null,
-        "share",
-        notificationContent
-      );
+    
+    setSelectedPostId(postId);
+    setRepostModalVisible(true);
+  };
+  
+  const confirmRepost = () => {
+    if (selectedPostId) {
+      repostMutation.mutate(selectedPostId);
+      setRepostModalVisible(false);
+      setSelectedPostId(null);
     }
-
-    console.log("Share post:", postId);
+  };
+  
+  const cancelRepost = () => {
+    setRepostModalVisible(false);
+    setSelectedPostId(null);
   };
 
   const handleMore = (postId: string) => {
@@ -353,8 +442,15 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={() => handleComment(item.id)}>
             <Icon name="chatbubble-outline" size={20} color="#666" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleShare(item.id)}>
-            <Icon name="share-outline" size={20} color="#666" />
+          <TouchableOpacity onPress={() => handleRepost(item.id)}>
+            <Icon
+              name={item.isReposted ? "repeat" : "repeat-outline"}
+              size={20}
+              color={item.isReposted ? "#00aa00" : "#666"}
+            />
+            {item.reposts > 0 && (
+              <Text style={styles.actionText}>{item.reposts}</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleMore(item.id)}>
             <Icon name="ellipsis-horizontal" size={20} color="#666" />
@@ -362,8 +458,10 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.stats}>
           {item.replies > 0 ? `${item.replies} replies` : ""}
-          {item.replies > 0 && item.likes > 0 ? " • " : ""}
+          {item.replies > 0 && (item.likes > 0 || item.reposts > 0) ? " • " : ""}
           {item.likes > 0 ? `${item.likes} likes` : ""}
+          {item.likes > 0 && item.reposts > 0 ? " • " : ""}
+          {item.reposts > 0 ? `${item.reposts} reposts` : ""}
         </Text>
       </View>
       <Text style={styles.time}>{item.time}</Text>
@@ -400,6 +498,31 @@ export default function HomeScreen() {
           <RefreshControl refreshing={isLoading} onRefresh={() => refetch()} />
         }
       />
+      
+      {/* Repost Modal */}
+      <Modal
+        visible={repostModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={cancelRepost}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Repost</Text>
+            <Text style={styles.modalText}>
+              This post will be shared with your followers.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={cancelRepost}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmButton} onPress={confirmRepost}>
+                <Text style={styles.confirmButtonText}>Repost</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -430,4 +553,58 @@ const styles = StyleSheet.create({
   mention: { color: "#007AFF" },
   stats: { fontSize: 12, color: "#999" },
   time: { fontSize: 10, color: "#aaa", alignSelf: "flex-end" },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 24,
+    textAlign: "center",
+    color: "#666",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 12,
+    marginRight: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontWeight: "600",
+  },
+  confirmButton: {
+    flex: 1,
+    padding: 12,
+    marginLeft: 8,
+    borderRadius: 8,
+    backgroundColor: "#007AFF",
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    color: "white",
+    fontWeight: "600",
+  },
 });
