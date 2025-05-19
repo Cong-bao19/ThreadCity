@@ -23,7 +23,28 @@ export default function HelpScreen() {
         <View style={{ width: 28 }} />
       </View>
       <View style={styles.content}>
-        <Text>Chức năng trợ giúp sẽ cập nhật sau.</Text>
+        <View style={styles.list}>
+          <View style={styles.listItem}>
+            <Text style={styles.listText}>Báo cáo sự cố</Text>
+            <Icon name="chevron-forward-outline" size={22} color="#888" />
+          </View>
+          <View style={styles.listItem}>
+            <Text style={styles.listText}>Trung tâm trợ giúp</Text>
+            <Icon name="chevron-forward-outline" size={22} color="#888" />
+          </View>
+          <View style={styles.listItem}>
+            <Text style={styles.listText}>Trợ giúp về bảo mật và quyền riêng tư</Text>
+            <Icon name="chevron-forward-outline" size={22} color="#888" />
+          </View>
+          <View style={styles.listItem}>
+            <Text style={styles.listText}>Yêu cầu hỗ trợ</Text>
+            <Icon name="chevron-forward-outline" size={22} color="#888" />
+          </View>
+          <View style={styles.listItem}>
+            <Text style={styles.listText}>Hướng dẫn về mạng xã hội phi tập trung</Text>
+            <Icon name="chevron-forward-outline" size={22} color="#888" />
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -32,13 +53,17 @@ export default function HelpScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee',
+  },
+  title: { fontSize: 22, fontWeight: "bold" },
+  content: { flex: 1, padding: 10 },
+  list: { marginTop: 2 },
+  listItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 10,
     justifyContent: 'space-between',
-    padding: 5,
-    elevation: 3,
-    backgroundColor: '#fff',
   },
-  title: { fontSize: 22, fontWeight: "bold", margin: 20 },
-  content: { flex: 1, alignItems: "center", justifyContent: "center" },
+  listText: { fontSize: 16, color: '#222' },
 });
