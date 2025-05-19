@@ -106,6 +106,14 @@ export default function TabLayout() {
         <Tabs.Screen name="edit" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
         <Tabs.Screen name="profile-settings" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="saved" options={{ href: null }} />
+        <Tabs.Screen name="likes" options={{ href: null }} />
+        <Tabs.Screen name="privacy" options={{ href: null }} />
+        <Tabs.Screen name="account-status" options={{ href: null }} />
+        <Tabs.Screen name="about" options={{ href: null }} />
+        <Tabs.Screen name="help" options={{ href: null }} />
+        <Tabs.Screen name="invite-friends" options={{ href: null }} />
       </Tabs>
     </UserProvider>
   );

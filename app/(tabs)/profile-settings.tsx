@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/lib/supabase";
 
 const settingsItems = [
@@ -17,57 +17,60 @@ const settingsItems = [
   { icon: "bookmark-outline", label: "Đã lưu" },
   { icon: "heart-outline", label: "Lượt thích của bạn" },
   { icon: "lock-closed-outline", label: "Quyền riêng tư" },
-  { icon: "person-outline", label: "Tài khoản" },
   { icon: "shield-checkmark-outline", label: "Trạng thái tài khoản" },
   { icon: "help-circle-outline", label: "Trợ giúp" },
   { icon: "information-circle-outline", label: "Giới thiệu" },
 ];
 
-const handleItemPress = (label: string) => {
-  switch (label) {
-    case "Theo dõi & mời bạn bè":
-      // TODO: Điều hướng đến trang mời bạn bè
-      break;
-    case "Thông báo":
-      // TODO: Điều hướng đến trang thông báo
-      break;
-    case "Đã lưu":
-      // TODO: Điều hướng đến trang đã lưu
-      break;
-    case "Lượt thích của bạn":
-      // TODO: Điều hướng đến trang lượt thích
-      break;
-    case "Quyền riêng tư":
-      // TODO: Điều hướng đến trang quyền riêng tư
-      break;
-    case "Tài khoản":
-      // TODO: Điều hướng đến trang tài khoản
-      break;
-    case "Trạng thái tài khoản":
-      // TODO: Điều hướng đến trang trạng thái tài khoản
-      break;
-    case "Trợ giúp":
-      // TODO: Điều hướng đến trang trợ giúp
-      break;
-    case "Giới thiệu":
-      // TODO: Điều hướng đến trang giới thiệu
-      break;
-    default:
-      break;
-  }
-};
-
-const handleLogout = async () => {
-  // Đăng xuất khỏi supabase
-  try {
-    await supabase.auth.signOut();
-    router.replace("/Login");
-  } catch (err) {
-    alert("Đăng xuất thất bại!");
-  }
-};
-
 export default function ProfileSettingsScreen() {
+  const params = useLocalSearchParams();
+  const username = params.username as string | undefined;
+
+  const handleItemPress = (label: string) => {
+    switch (label) {
+      case "Theo dõi & mời bạn bè":
+        if (username) {
+          router.push({ pathname: '/invite-friends', params: { username } });
+        } else {
+          router.push('/invite-friends');
+        }
+        break;
+      case "Thông báo":
+        router.push('/(tabs)/notifications');
+        break;
+      case "Đã lưu":
+        router.push('/(tabs)/saved');
+        break;
+      case "Lượt thích của bạn":
+        router.push('/(tabs)/likes');
+        break;
+      case "Quyền riêng tư":
+        router.push('/(tabs)/privacy');
+        break;
+      case "Trạng thái tài khoản":
+        router.push('/(tabs)/account-status');
+        break;
+      case "Trợ giúp":
+        router.push('/(tabs)/help');
+        break;
+      case "Giới thiệu":
+        router.push('/(tabs)/about');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleLogout = async () => {
+    // Đăng xuất khỏi supabase
+    try {
+      await supabase.auth.signOut();
+      router.replace("/Login");
+    } catch (err) {
+      alert("Đăng xuất thất bại!");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
