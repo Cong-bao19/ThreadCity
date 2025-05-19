@@ -6,8 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { SplashScreen, Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { LogBox } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
+
+// Ignore specific warnings
+LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 export default function RootLayout() {
   const router = useRouter();

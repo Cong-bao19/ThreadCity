@@ -45,7 +45,8 @@ const IconWithLabel = ({
   color?: string; 
   onPress?: () => void; 
   accessibilityLabel: string;
-}) => (  <TouchableOpacity 
+}) => (
+  <TouchableOpacity 
     style={styles.actionButton} 
     onPress={onPress} 
     accessibilityLabel={accessibilityLabel}
@@ -80,9 +81,8 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
       <View style={styles.threadItem}>
         {item.isRepost && (
           <View style={styles.repostHeader}>
-            <Icon name="repeat" size={14} color="#666" style={{marginRight: 5}} />
-            <Text style={styles.repostText}>
-              {repostedBy} <Text>reposted</Text>
+            <Icon name="repeat" size={14} color="#666" style={{marginRight: 5}} />            <Text style={styles.repostText}>
+              <Text>{repostedBy}</Text> <Text>reposted</Text>
             </Text>
             <Text style={styles.repostTime}> • {repostedTime}</Text>
           </View>
@@ -129,7 +129,7 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
                 accessibilityLabel="Post image"
               />
             )}
-
+            
             <View style={styles.actions}>
               <IconWithLabel 
                 name={item.isLiked ? "heart" : "heart-outline"}
@@ -151,87 +151,88 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
                 color={item.isRepost ? "#00aa00" : "#000"}
                 accessibilityLabel="Repost"
               />
-                <IconWithLabel 
+              
+              <IconWithLabel 
                 name="share-outline"
                 label="Share"
                 onPress={() => onShare(item)}
                 accessibilityLabel="Share post"
               />
             </View>
+          </View>
         </View>
-      </View>
 
-      {item.repliesData && item.repliesData.length > 0 && item.repliesData.map((reply) => {
-        // Ensure all reply values are strings or have defaults
-        const replyUsername = reply.username || '';
-        const replyHandle = reply.handle || '';
-        const replyTime = reply.time || '';
-        const replyContent = reply.content || '';
-        const replyLikes = reply.likes || 0;
-        const replyAvatar = reply.avatar || 'https://via.placeholder.com/40';
-        
-        return (
-          <View key={reply.id} style={styles.replyContainer}>
-            <TouchableOpacity 
-              onPress={() => onProfilePress && onProfilePress(reply.userId)}
-              accessibilityLabel={`${replyUsername}'s profile picture`}
-            >
-              <Avatar
-                rounded
-                source={{ uri: replyAvatar }}
-                size="medium"
-                containerStyle={styles.avatar}
-              />
-            </TouchableOpacity>
-            
-            <View style={styles.postContent}>
-              <View style={styles.postUser}>
-                <Text style={styles.username}>{replyUsername}</Text>
-                <Text style={styles.postHandle}>{replyHandle}</Text>
-                <Text style={styles.time}> • {replyTime}</Text>
-                <TouchableOpacity accessibilityLabel="Reply options">
-                  <Icon
-                    name="ellipsis-horizontal"
-                    size={16}
-                    color="#666"
-                    style={styles.postMenu}
+        {item.repliesData && item.repliesData.length > 0 && item.repliesData.map((reply) => {
+          // Ensure all reply values are strings or have defaults
+          const replyUsername = reply.username || '';
+          const replyHandle = reply.handle || '';
+          const replyTime = reply.time || '';
+          const replyContent = reply.content || '';
+          const replyLikes = reply.likes || 0;
+          const replyAvatar = reply.avatar || 'https://via.placeholder.com/40';
+          
+          return (
+            <View key={reply.id} style={styles.replyContainer}>
+              <TouchableOpacity 
+                onPress={() => onProfilePress && onProfilePress(reply.userId)}
+                accessibilityLabel={`${replyUsername}'s profile picture`}
+              >
+                <Avatar
+                  rounded
+                  source={{ uri: replyAvatar }}
+                  size="medium"
+                  containerStyle={styles.avatar}
+                />
+              </TouchableOpacity>
+              
+              <View style={styles.postContent}>
+                <View style={styles.postUser}>
+                  <Text style={styles.username}>{replyUsername}</Text>
+                  <Text style={styles.postHandle}>{replyHandle}</Text>
+                  <Text style={styles.time}> • {replyTime}</Text>
+                  <TouchableOpacity accessibilityLabel="Reply options">
+                    <Icon
+                      name="ellipsis-horizontal"
+                      size={16}
+                      color="#666"
+                      style={styles.postMenu}
+                    />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.threadText}>{replyContent}</Text>
+                
+                <View style={styles.actions}>
+                  <IconWithLabel 
+                    name="heart-outline"
+                    label={replyLikes}
+                    accessibilityLabel="Like reply"
                   />
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.threadText}>{replyContent}</Text>
-              
-              <View style={styles.actions}>
-                <IconWithLabel 
-                  name="heart-outline"
-                  label={replyLikes}
-                  accessibilityLabel="Like reply"
-                />
-                
-                <IconWithLabel 
-                  name="chatbubble-outline"
-                  label="Reply"
-                  accessibilityLabel="Reply to comment"
-                />
-                
-                <IconWithLabel 
-                  name="repeat-outline"
-                  label="Repost"
-                  accessibilityLabel="Repost reply"
-                />
-                
-                <IconWithLabel 
-                  name="share-outline"
-                  label="Share"
-                  accessibilityLabel="Share reply"
-                />
+                  
+                  <IconWithLabel 
+                    name="chatbubble-outline"
+                    label="Reply"
+                    accessibilityLabel="Reply to comment"
+                  />
+                  
+                  <IconWithLabel 
+                    name="repeat-outline"
+                    label="Repost"
+                    accessibilityLabel="Repost reply"
+                  />
+                  
+                  <IconWithLabel 
+                    name="share-outline"
+                    label="Share"
+                    accessibilityLabel="Share reply"
+                  />
+                </View>
               </View>
             </View>
-          </View>
-        );
-      })}
-    </View>
-  </TouchableOpacity>
+          );
+        })}
+      </View>
+    </TouchableOpacity>
   );
 };
 
