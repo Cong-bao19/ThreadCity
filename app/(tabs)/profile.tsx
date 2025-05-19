@@ -1067,7 +1067,7 @@ export default function ProfileScreen() {
             <Icon name="globe-outline" size={24} color="#000" />
           </TouchableOpacity>
         )}
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/profile-settings', params: { username: profileData.username } })}>
           <Icon name="menu-outline" size={24} color="#000" />
         </TouchableOpacity>
       </View>
