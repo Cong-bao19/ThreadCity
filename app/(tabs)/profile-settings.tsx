@@ -36,25 +36,53 @@ export default function ProfileSettingsScreen() {
         }
         break;
       case "Thông báo":
-        router.push('/(tabs)/notifications');
+        if (username) {
+          router.push({ pathname: '/(tabs)/notifications', params: { username } });
+        } else {
+          router.push('/(tabs)/notifications');
+        }
         break;
       case "Đã lưu":
-        router.push('/(tabs)/saved');
+        if (username) {
+          router.push({ pathname: '/(tabs)/saved', params: { username } });
+        } else {
+          router.push('/(tabs)/saved');
+        }
         break;
       case "Lượt thích của bạn":
-        router.push('/(tabs)/likes');
+        if (username) {
+          router.push({ pathname: '/(tabs)/likes', params: { username } });
+        } else {
+          router.push('/(tabs)/likes');
+        }
         break;
       case "Quyền riêng tư":
-        router.push('/(tabs)/privacy');
+        if (username) {
+          router.push({ pathname: '/(tabs)/privacy', params: { username } });
+        } else {
+          router.push('/(tabs)/privacy');
+        }
         break;
       case "Trạng thái tài khoản":
-        router.push('/(tabs)/account-status');
+        if (username) {
+          router.push({ pathname: '/(tabs)/account-status', params: { username } });
+        } else {
+          router.push('/(tabs)/account-status');
+        }
         break;
       case "Trợ giúp":
-        router.push('/(tabs)/help');
+        if (username) {
+          router.push({ pathname: '/(tabs)/help', params: { username } });
+        } else {
+          router.push('/(tabs)/help');
+        }
         break;
       case "Giới thiệu":
-        router.push('/(tabs)/about');
+        if (username) {
+          router.push({ pathname: '/(tabs)/about', params: { username } });
+        } else {
+          router.push('/(tabs)/about');
+        }
         break;
       default:
         break;
@@ -74,7 +102,13 @@ export default function ProfileSettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => {
+          if (username) {
+            router.push({ pathname: '/profile', params: { userId: undefined, username } });
+          } else {
+            router.push('/profile');
+          }
+        }}>
           <Icon name="arrow-back-outline" size={28} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Cài đặt</Text>
