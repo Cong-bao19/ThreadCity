@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { supabase } from "../lib/supabase";
 import { useUser } from "../lib/UserContext";
+import { router } from "expo-router";
 
 export default function InstagramLogin() {
   const [username, setUsername] = useState("");
@@ -64,7 +65,7 @@ export default function InstagramLogin() {
       >
         <View style={styles.logoContainer}>
           <Image
-            source={require("../assets/images/instagram-logo.png")}
+            source={require("../assets/images/threadlogo.png")}
             style={styles.logo}
           />
         </View>
