@@ -1,6 +1,6 @@
 // app/(tabs)/homeUtils.ts
 import { supabase } from "@/lib/supabase";
-import { Post } from "./homeTypes";
+import { Post } from "../home/homeTypes";
 
 export const formatTimeAgo = (date: Date): string => {
   const now = new Date();

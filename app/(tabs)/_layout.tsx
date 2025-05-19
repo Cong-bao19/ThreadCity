@@ -8,7 +8,7 @@ import TabBarBackground from "@/components/ui/TabBarBackground";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { UserProvider } from "@/lib/UserContext";
 import { Image } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -86,6 +86,15 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="chatUserList"
+          options={{
+            title: "Chat",
+            tabBarIcon: ({ focused }) => (
+              <Icon name="chatbubble-ellipses-outline" size={22} color={focused ? "#000" : "#666"} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: "Profile",
@@ -114,6 +123,7 @@ export default function TabLayout() {
         <Tabs.Screen name="about" options={{ href: null }} />
         <Tabs.Screen name="help" options={{ href: null }} />
         <Tabs.Screen name="invite-friends" options={{ href: null }} />
+        <Tabs.Screen name="chat" options={{ href: null }} />
       </Tabs>
     </UserProvider>
   );

@@ -8,13 +8,13 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
   Dimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import Icon from "react-native-vector-icons/Ionicons";
 import { supabase } from "@/lib/supabase";
