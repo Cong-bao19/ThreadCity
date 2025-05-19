@@ -587,15 +587,12 @@ export default function ProfileScreen() {
       fetchPosts();
       fetchReplies();
     }
-  }, [profileUserId]);
-
-  const handlePostPress = (postId: string) => {
-    router.push(`/thread/${postId}`);
+  }, [profileUserId]);  const handlePostPress = (postId: string) => {
+    router.push(`../thread/${postId}`);
   };
-
   const handleProfilePress = (targetUserId: string) => {
     router.push({
-      pathname: "/(tabs)/profile",
+      pathname: "../profile",
       params: { userId: targetUserId },
     });
   };
@@ -1009,9 +1006,8 @@ export default function ProfileScreen() {
       </View>
     </View>
   );
-
   const handleEditProfile = () => {
-    router.push("/edit");
+    router.push("../edit");
   };
 
   // Handle refresh when pulling down the FlatList
@@ -1055,21 +1051,38 @@ export default function ProfileScreen() {
           <TouchableOpacity 
             onPress={() => {
               router.push({
-                pathname: "/(tabs)/profile",
+                pathname: "../profile",
                 params: { userId: userId },
               });
             }}
           >
             <Icon name="arrow-back-outline" size={24} color="#000" />
           </TouchableOpacity>
-        ) : (
+        ): (
           <TouchableOpacity>
             <Icon name="globe-outline" size={24} color="#000" />
           </TouchableOpacity>
-        )}
-        <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/profile-settings', params: { username: profileData.username } })}>
-          <Icon name="menu-outline" size={24} color="#000" />
-        </TouchableOpacity>
+        )}        <View style={styles.headerRight}>          <TouchableOpacity 
+            style={styles.iconButton} 
+            onPress={() => {
+              try {
+                router.push("../qrscanner");
+              } catch (error) {
+                console.error("Navigation error:", error);
+                Alert.alert("Navigation Error", "Could not open QR scanner");
+              }
+            }}
+          >
+            <Icon name="qr-code-outline" size={24} color="#000" />
+          </TouchableOpacity><TouchableOpacity 
+            onPress={() => router.push({ 
+              pathname: "../profile-settings", 
+              params: { username: profileData.username } 
+            })}
+          >
+            <Icon name="menu-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Profile Info */}
@@ -1546,5 +1559,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconButton: {
+    marginRight: 20,
   },
 });
