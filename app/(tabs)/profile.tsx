@@ -894,9 +894,23 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity>
-          <Icon name="globe-outline" size={24} color="#000" />
-        </TouchableOpacity>
+        {/* Nút quay lại profile của mình khi đang xem trang cá nhân người khác */}
+        {profileUserId !== userId ? (
+          <TouchableOpacity 
+            onPress={() => {
+              router.push({
+                pathname: "/(tabs)/profile",
+                params: { userId: userId },
+              });
+            }}
+          >
+            <Icon name="arrow-back-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity>
+            <Icon name="globe-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity>
           <Icon name="menu-outline" size={24} color="#000" />
         </TouchableOpacity>
