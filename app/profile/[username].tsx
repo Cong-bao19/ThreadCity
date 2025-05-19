@@ -2,7 +2,7 @@ import { useUser } from "@/lib/UserContext";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BlurView } from 'expo-blur';
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import React from "react";
 import {
@@ -17,7 +17,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
+import { Divider } from "react-native-elements";
 import QRCode from 'react-native-qrcode-svg';
 import Icon from "react-native-vector-icons/Ionicons";
 import ProfileButtons from './ProfileButtons';
@@ -343,44 +345,6 @@ export default function ProfileScreen() {
     }
   }, [userProfile?.id, currentUserId]);
 
-  useEffect(() => {
-    if (userProfile?.username) {
-      navigation.setOptions({
-        title: "Quay lại",
-        headerTitleStyle: {
-          marginLeft: 0,
-          fontSize: 18,
-          fontWeight: "bold",
-          color: "#222",
-        },
-        headerRight: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 6 }}>
-            <TouchableOpacity onPress={() => {/* TODO: Mở Instagram */}}>
-              <Image source={require("../../assets/images/instagram-logo.png")} style={{ width: 30, height: 24 }} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => {/* TODO: Xử lý thông báo */}}>
-              <Icon name="notifications-outline" size={22} color="#222" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setSettingsVisible(true)}
-              style={{
-                backgroundColor: '#eee',
-                borderRadius: 16,
-                width: 26,
-                height: 26,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Icon name="ellipsis-horizontal" size={18} color="#222" />
-            </TouchableOpacity>
-          </View>
-        ),
-      });
-    }
-  }, [userProfile?.username, navigation]);
-
-
   const handleFollow = async () => {
     if (!currentUserId || !userProfile?.id) return;
 
@@ -422,7 +386,6 @@ export default function ProfileScreen() {
   const handleCopyLink = () => {
     Clipboard.setString(profileLink);
     setSettingsVisible(false);
-    // Optionally show a toast or alert
   };
 
   const handleShareProfile = async () => {
@@ -440,7 +403,12 @@ export default function ProfileScreen() {
   if (isUserLoading || isPostsLoading || isRepliesLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Loading...</Text>
+        {/* Ẩn header mặc định của navigation */}
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -448,6 +416,8 @@ export default function ProfileScreen() {
   if (isUserError || isPostsError || isRepliesError) {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Ẩn header mặc định của navigation */}
+        <Stack.Screen options={{ headerShown: false }} />
         <Text>Error: {(userError || postsError || repliesError)?.message}</Text>
       </SafeAreaView>
     );
@@ -456,6 +426,8 @@ export default function ProfileScreen() {
   if (!userProfile) {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Ẩn header mặc định của navigation */}
+        <Stack.Screen options={{ headerShown: false }} />
         <Text>User not found</Text>
       </SafeAreaView>
     );
@@ -465,15 +437,40 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ProfileHeader username={userProfile.username} avatar={userProfile.avatar} />
-      <ProfileInfo bio={userProfile.bio} link={userProfile.link} followers={userProfile.followers} />
+      {/* Ẩn header mặc định của navigation */}
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Sử dụng ProfileHeader với prop onMenuPress */}
+      <ProfileHeader 
+        username={userProfile.username} 
+        avatar={userProfile.avatar}
+        isCurrentUserProfile={userProfile.id === currentUserId}
+        currentUserId={currentUserId}
+        onMenuPress={() => setSettingsVisible(true)}
+      />
+
+      <ProfileInfo 
+        username={userProfile.username}
+        avatar={userProfile.avatar}
+        bio={userProfile.bio} 
+        link={userProfile.link} 
+        followers={userProfile.followers} 
+      />
+
       <ProfileButtons
         isFollowing={isFollowing}
         isPrivate={userProfile.is_private}
         isCurrentUser={userProfile.id === currentUserId}
         onFollow={handleFollow}
+        onShowQR={() => setShowQR(true)}
+        inforUrl={profileLink}
       />
+
       <ProfileTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      <Divider style={styles.divider} />
+
+      {/* Phần nội dung - giữ nguyên */}
       <FlatList
         data={
           activeTab === "Thread"
@@ -486,8 +483,17 @@ export default function ProfileScreen() {
           <ProfilePost item={item} onPress={handlePostPress} onShare={handleShare} />
         )}
         keyExtractor={(item) => item.id}
-        style={styles.postList}
+        style={styles.content}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {activeTab === "Thread" ? "No threads yet" : "No replies yet"}
+            </Text>
+          </View>
+        }
       />
+      
+      {/* Modals - giữ nguyên */}
       <Modal
         visible={settingsVisible}
         transparent

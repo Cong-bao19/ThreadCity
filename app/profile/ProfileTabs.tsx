@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import styles from './profileStyles';
 
 interface Tab {
@@ -12,29 +12,31 @@ interface ProfileTabsProps {
   setActiveTab: (tab: string) => void;
 }
 
+// Chỉ hiển thị 2 tab giống như trong profile.tsx
 const TABS: Tab[] = [
-  { label: "Thread", value: "Thread" },
-  { label: "Thread trả lời", value: "Thread trả lời" },
-  { label: "File phương tiện", value: "File phương tiện" },
-  { label: "Bài đăng lại", value: "Bài đăng lại" },
+  { label: "Threads", value: "Threads" },
+  { label: "Replies", value: "Replies" },
 ];
 
 const ProfileTabs: React.FC<ProfileTabsProps> = ({ activeTab, setActiveTab }) => (
-  <View style={styles.tabs}>
-    <FlatList
-      data={TABS}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={[styles.tab, activeTab === item.value && styles.activeTab]}
-          onPress={() => setActiveTab(item.value)}
+  <View style={styles.navTabs}>
+    {TABS.map((item) => (
+      <TouchableOpacity
+        key={item.value}
+        style={styles.navTab}
+        onPress={() => setActiveTab(item.value)}
+      >
+        <Text
+          style={[
+            styles.navTabText,
+            activeTab === item.value && styles.navTabActive,
+          ]}
         >
-          <Text style={styles.tabText}>{item.label}</Text>
-        </TouchableOpacity>
-      )}
-      keyExtractor={(item) => item.value}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-    />
+          {item.label}
+        </Text>
+        {activeTab === item.value && <View style={styles.underline} />}
+      </TouchableOpacity>
+    ))}
   </View>
 );
 

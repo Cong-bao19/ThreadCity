@@ -35,6 +35,7 @@ interface Post {
   repostedTime?: string;
   repostedId?: string;
   actualCreatedAt: Date; // Thời gian thực tế để sắp xếp (thời gian repost hoặc thời gian đăng bài)
+  isLiked?: boolean; // Thêm trạng thái đã like hay chưa
 }
 
 interface Reply {
@@ -46,6 +47,7 @@ interface Reply {
   likes: number;
   avatar: string;
   userId: string;
+  isLiked?: boolean; // Thêm trạng thái đã like hay chưa cho cả reply
 }
 
 interface ProfileData {
@@ -152,7 +154,7 @@ export default function ProfileScreen() {
 
   // Tải danh sách bài đăng
   const fetchPosts = async () => {
-    if (!profileUserId) return;
+    if (!profileUserId || !userId) return;
 
     try {
       setRefreshing(true);
@@ -224,6 +226,20 @@ export default function ProfileScreen() {
         .map((repost: any) => repost.posts.id);
 
       const allPostIds = [...ownPostIds, ...repostPostIds];
+
+      // Kiểm tra bài đăng người dùng đã like
+      const { data: userLikes, error: likesError } = await supabase
+        .from("likes")
+        .select("post_id")
+        .eq("user_id", userId)
+        .in("post_id", allPostIds);
+
+      if (likesError) {
+        console.error("Error fetching user likes:", likesError);
+      }
+
+      // Tạo map các bài viết đã được like bởi người dùng hiện tại
+      const likedPostIds = new Set(userLikes?.map((like: any) => like.post_id) || []);
 
       // Lấy ID của người dùng đã đăng bài repost
       const repostedUserIds = repostsData
@@ -311,6 +327,9 @@ export default function ProfileScreen() {
           (comment: any) => comment.post_id === post.id
         );
 
+        // Kiểm tra xem bài đăng đã được like bởi người dùng hiện tại hay chưa
+        const isLiked = likedPostIds.has(post.id);
+
         return {
           id: post.id,
           userId: post.user_id,
@@ -324,6 +343,7 @@ export default function ProfileScreen() {
           image_url: post.image_url || undefined,
           isRepost: false,
           actualCreatedAt: createdAt, // Thời gian đăng bài thực tế
+          isLiked, // Thêm trạng thái like từ người dùng hiện tại
           repliesData: postComments.map((comment: any) => {
             const profile = profilesMap[comment.user_id] || {};
             const commentTime = new Date(comment.created_at);
@@ -358,6 +378,7 @@ export default function ProfileScreen() {
               time: timeComment,
               likes: comment.likes?.[0]?.count || 0,
               avatar: profile.avatar_url || "https://via.placeholder.com/50",
+              isLiked: false, // Không cần kiểm tra trạng thái like cho comment
             };
           }),
         };
@@ -410,6 +431,9 @@ export default function ProfileScreen() {
             (comment: any) => comment.post_id === post.id
           );
 
+          // Kiểm tra xem bài đăng đã được like bởi người dùng hiện tại hay chưa
+          const isLiked = likedPostIds.has(post.id);
+
           return {
             id: post.id,
             userId: post.user_id,
@@ -426,6 +450,7 @@ export default function ProfileScreen() {
             repostedTime,
             repostedId: repost.id,
             actualCreatedAt: repostCreatedAt, // Thời gian repost thực tế (không phải thời gian đăng bài gốc)
+            isLiked, // Thêm trạng thái like từ người dùng hiện tại
             repliesData: postComments.map((comment: any) => {
               const profile = profilesMap[comment.user_id] || {};
               const commentTime = new Date(comment.created_at);
@@ -460,6 +485,7 @@ export default function ProfileScreen() {
                 time: timeComment,
                 likes: comment.likes?.[0]?.count || 0,
                 avatar: profile.avatar_url || "https://via.placeholder.com/50",
+                isLiked: false, // Không cần kiểm tra trạng thái like cho comment
               };
             }),
           };
@@ -542,6 +568,7 @@ export default function ProfileScreen() {
           time,
           likes: comment.likes?.[0]?.count || 0,
           avatar: profileData.avatar_url || "https://via.placeholder.com/50",
+          isLiked: false, // Mặc định là chưa like
         };
       });
 
@@ -695,6 +722,135 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleLike = async (postId: string) => {
+    if (!userId) {
+      Alert.alert("Please log in to like a post");
+      return;
+    }
+
+    try {
+      // Tìm bài viết để cập nhật UI ngay lập tức (optimistic update)
+      const post = posts.find((p) => p.id === postId);
+      if (!post) return;
+
+      // Cập nhật UI ngay (optimistic update)
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+              }
+            : p
+        )
+      );
+
+      // Gửi request đến server
+      const { data: existingLike, error: likeError } = await supabase
+        .from("likes")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", userId)
+        .single();
+
+      if (likeError && likeError.code !== "PGRST116") {
+        throw new Error(`Error checking like: ${likeError.message}`);
+      }
+
+      if (existingLike) {
+        // Người dùng đã like trước đó -> unlike
+        const { error: deleteError } = await supabase
+          .from("likes")
+          .delete()
+          .eq("id", existingLike.id);
+          
+        if (deleteError) {
+          throw new Error(`Error removing like: ${deleteError.message}`);
+        }
+      } else {
+        // Người dùng chưa like -> like
+        const { error: insertError } = await supabase
+          .from("likes")
+          .insert({ post_id: postId, user_id: userId });
+          
+        if (insertError) {
+          throw new Error(`Error adding like: ${insertError.message}`);
+        }
+        
+        // Tạo thông báo khi like (chỉ khi người dùng like bài viết của người khác)
+        const postOwnerId = post.userId;
+        if (userId !== postOwnerId) {
+          const { data: actorProfile } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", userId)
+            .single();
+
+          const actorUsername = actorProfile?.username || "Someone";
+          const notificationContent = `${actorUsername} liked your post`;
+          
+          // Tạo thông báo
+          await createNotification(
+            postOwnerId,
+            userId,
+            postId,
+            null,
+            "like",
+            notificationContent
+          );
+        }
+      }
+    } catch (error) {
+      // Nếu có lỗi, hoàn tác cập nhật UI
+      console.error("Error toggling like:", error);
+      
+      // Roll back UI (revert optimistic update)
+      setPosts((prevPosts) =>
+        prevPosts.map((p) => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              isLiked: !p.isLiked, // Đảo ngược trạng thái
+              likes: p.isLiked ? p.likes - 1 : p.likes + 1, // Đảo ngược số lượng
+            };
+          }
+          return p;
+        })
+      );
+      
+      Alert.alert("Error", "Failed to update like status");
+    }
+  };
+
+  // Hàm tạo thông báo (giống trong index.tsx)
+  const createNotification = async (
+    userId: string, // Người nhận thông báo (chủ comment hoặc bài viết)
+    actorId: string, // Người thực hiện hành động (người dùng hiện tại)
+    postId: string, // ID bài viết
+    commentId: string | null, // ID comment (dùng cho reply)
+    type: "like" | "comment" | "follow" | "reply" | "like cmt", // Loại hành động
+    content: string // Nội dung thông báo
+  ) => {
+    try {
+      const { error } = await supabase.from("notifications").insert({
+        user_id: userId,
+        actor_id: actorId,
+        post_id: postId,
+        comment_id: commentId,
+        type: type,
+        content: content,
+        is_read: false,
+      });
+
+      if (error) {
+        console.error(`Error creating ${type} notification:`, error);
+      }
+    } catch (error) {
+      console.error("Unexpected error creating notification:", error);
+    }
+  };
+
   const renderPost = ({ item }: { item: Post }) => (
     <TouchableOpacity onPress={() => handlePostPress(item.id)}>
       <View style={styles.threadItem}>
@@ -743,8 +899,8 @@ export default function ProfileScreen() {
             )}
 
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Icon name="heart-outline" size={20} color="#000" />
+              <TouchableOpacity style={styles.actionButton} onPress={() => handleLike(item.id)}>
+                <Icon name={item.isLiked ? "heart" : "heart-outline"} size={20} color={item.isLiked ? "#e63946" : "#000"} />
                 <Text style={styles.actionText}>{item.likes}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
