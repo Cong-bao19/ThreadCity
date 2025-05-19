@@ -47,7 +47,7 @@ export default function ProfileEdit() {
         avatar_url: "",
         bio: "",
         is_private: false,
-        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       });
       if (insertError) {
         console.log("Lỗi khi tạo profile mới:", insertError);
@@ -67,13 +67,23 @@ export default function ProfileEdit() {
       // Tạo profile nếu chưa có (phòng trường hợp mới đăng nhập)
       await createProfileIfNotExists(user.id);
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("username, avatar_url, bio, is_private")
-        .eq("id", user.id)
-        .single();
+      // Thử lấy profile, nếu chưa có thì thử lại sau 300ms (tối đa 3 lần)
+      let tries = 0;
+      let data, error;
+      while (tries < 3) {
+        const res = await supabase
+          .from("profiles")
+          .select("username, avatar_url, bio, is_private")
+          .eq("id", user.id)
+          .single();
+        data = res.data;
+        error = res.error;
+        if (data) break;
+        await new Promise((r) => setTimeout(r, 300));
+        tries++;
+      }
 
-      if (error) {
+      if (error && !data) {
         Alert.alert("Lỗi", "Không tải được hồ sơ: " + error.message);
       } else if (data) {
         setUsername(data.username || "");
@@ -100,7 +110,7 @@ export default function ProfileEdit() {
       avatar_url: avatarUrl.trim(),
       bio: bio.trim(),
       is_private: isPrivate,
-      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     console.log("Updating user profile:", updates);
@@ -115,7 +125,7 @@ export default function ProfileEdit() {
     } else {
       console.log("Updated profile:", data);
       Alert.alert("Thành công", "Cập nhật hồ sơ thành công!");
-      router.replace("/Login"); // Chuyển tới trang Home hoặc trang bạn muốn
+      router.replace("/Login");
     }
   };
 
