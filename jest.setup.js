@@ -49,6 +49,17 @@ jest.mock('expo-haptics', () => ({
   }
 }));
 
+// Mock for react-native-elements
+jest.mock('react-native-elements');
+
+// Mock cho expo-blur
+jest.mock('expo-blur', () => ({
+  BlurView: 'BlurView'
+}));
+
+// Mock cho react-native-qrcode-svg
+jest.mock('react-native-qrcode-svg', () => 'QRCode');
+
 // Mock cho react-native-vector-icons
 jest.mock('react-native-vector-icons/Ionicons', () => 'Icon');
 

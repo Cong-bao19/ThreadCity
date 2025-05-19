@@ -25,12 +25,13 @@ module.exports = {
     // "HelloWave.test.tsx",
     // "ExternalLink.test.tsx",
     // "Collapsible.test.tsx"
-  ],moduleNameMapper: {
+  ],  moduleNameMapper: {
     // Mock non-JS asset files
     "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__mocks__/fileMock.js",
     "\\.(css|less)$": "<rootDir>/__mocks__/styleMock.js",    // Add React Native specific mocks
     "^react-native$": "<rootDir>/__mocks__/react-native.js",
     "^react-native/Libraries/Components/.*": "<rootDir>/__mocks__/react-native.js",
+    "^react-native-elements$": "<rootDir>/__mocks__/react-native-elements.js",
     "@react-native/js-polyfills/error-guard": "<rootDir>/__mocks__/@react-native/js-polyfills/error-guard.js",
     // Add Expo polyfill mocks
     "expo/src/winter/PolyfillFunctions": "<rootDir>/__mocks__/expo/src/winter/PolyfillFunctions.js",
