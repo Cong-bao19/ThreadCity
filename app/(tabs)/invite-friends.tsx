@@ -107,7 +107,13 @@ const handleSendSMS = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => {
+    if (username) {
+      router.push({ pathname: '/profile-settings', params: { username } });
+    } else {
+      router.push('/profile-settings');
+    }
+  }}>
           <Icon name="arrow-back-outline" size={28} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mời bạn bè</Text>
