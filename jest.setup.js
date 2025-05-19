@@ -49,6 +49,9 @@ jest.mock('expo-haptics', () => ({
   }
 }));
 
+// Mock for react-native-elements
+jest.mock('react-native-elements');
+
 // Mock cho expo-blur
 jest.mock('expo-blur', () => ({
   BlurView: 'BlurView'

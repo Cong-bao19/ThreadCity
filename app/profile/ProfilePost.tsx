@@ -45,8 +45,7 @@ const IconWithLabel = ({
   color?: string; 
   onPress?: () => void; 
   accessibilityLabel: string;
-}) => (
-  <TouchableOpacity 
+}) => (  <TouchableOpacity 
     style={styles.actionButton} 
     onPress={onPress} 
     accessibilityLabel={accessibilityLabel}
@@ -152,13 +151,13 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
                 color={item.isRepost ? "#00aa00" : "#000"}
                 accessibilityLabel="Repost"
               />
-              
-              <IconWithLabel 
+                <IconWithLabel 
                 name="share-outline"
                 label="Share"
                 onPress={() => onShare(item)}
                 accessibilityLabel="Share post"
-              />          </View>
+              />
+            </View>
         </View>
       </View>
 

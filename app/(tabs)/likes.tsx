@@ -226,16 +226,15 @@ export default function LikesScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Lượt thích của bạn</Text>
         <View style={{ width: 28 }} />
-      </View>
-
-      {isLoading ? (
+      </View>      {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#000" />
-        </View>
-      ) : isError ? (
+          <Text style={{marginTop: 10, color: '#666'}}>Đang tải...</Text>
+        </View>      ): isError ? (
         <View style={styles.errorContainer}>
           <Icon name="alert-circle-outline" size={50} color="#FF6B6B" />
-          <Text style={styles.errorText}>Đã xảy ra lỗi khi tải dữ liệu</Text>          <Text style={styles.errorSubtext}>
+          <Text style={styles.errorText}>Đã xảy ra lỗi khi tải dữ liệu</Text>
+          <Text style={styles.errorSubtext}>
             {error ? (typeof error === 'object' && error !== null && 'message' in error 
               ? String(error.message) 
               : 'Lỗi không xác định')
@@ -244,8 +243,8 @@ export default function LikesScreen() {
           <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
-        </View>      ) : likedPosts && likedPosts.length > 0 ? (
-        <FlatList
+        </View>
+      ) : likedPosts && likedPosts.length > 0 ? (        <FlatList
           data={likedPosts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -258,7 +257,11 @@ export default function LikesScreen() {
             />
           )}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
+            <RefreshControl 
+              refreshing={isLoading} 
+              onRefresh={onRefresh}
+              colors={["#000"]} 
+            />
           }
           contentContainerStyle={styles.listContent}
           removeClippedSubviews={false}
