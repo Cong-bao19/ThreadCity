@@ -1,20 +1,16 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import styles from './profileStyles';
-
-interface Tab {
-  label: string;
-  value: string;
-}
+import { Tab } from './profileTypes';
 
 interface ProfileTabsProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-// Chỉ hiển thị 2 tab giống như trong profile.tsx
+// Use the Tab interface from profileTypes.ts and match the values used in [username].tsx
 const TABS: Tab[] = [
-  { label: "Threads", value: "Threads" },
+  { label: "Threads", value: "Thread" },
   { label: "Replies", value: "Replies" },
 ];
 

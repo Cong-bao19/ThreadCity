@@ -11,6 +11,13 @@ export interface Post {
   avatar: string;
   userId: string;
   repliesData: Reply[];
+  image_url?: string;
+  isRepost?: boolean;
+  repostedBy?: string;
+  repostedTime?: string;
+  repostedId?: string;
+  actualCreatedAt?: Date;
+  isLiked?: boolean;
 }
 
 export interface Reply {
@@ -22,6 +29,7 @@ export interface Reply {
   likes: number;
   avatar: string;
   userId: string;
+  isLiked?: boolean;
 }
 
 export interface UserProfile {

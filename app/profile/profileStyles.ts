@@ -209,13 +209,17 @@ const profileStyles = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    width: 120,
+    marginTop: 10,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 20,
   },
   actionText: {
-    fontSize: 12,
+    marginLeft: 5,
+    fontSize: 14,
     color: "#666",
-    marginLeft: 4,
   },
   settingItem: {
     flexDirection: 'row',
@@ -309,6 +313,40 @@ const profileStyles = StyleSheet.create({
     height: 200,
     borderRadius: 8,
     marginTop: 10,
+  },
+  // Styles bổ sung cho ProfilePost.tsx
+  threadItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  postHeader: {
+    flexDirection: "row",
+  },
+  postUser: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  postHandle: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 5,
+  },
+  time: {
+    fontSize: 14,
+    color: "#666",
+  },
+  postMenu: {
+    marginLeft: 5,
+  },
+  threadText: {
+    fontSize: 16,
+    marginTop: 5,
+  },
+  replyContainer: {
+    flexDirection: "row",
+    marginTop: 10,
+    marginLeft: 60,
   },
 });
 
