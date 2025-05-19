@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { useState } from "react";
+import axios from "axios";
 import {
   FlatList,
   Image,
@@ -50,105 +51,64 @@ export default function HomeScreen() {
   }, [data]);
 
   // Mutation cho like
-  const likeMutation = useMutation({
-    mutationFn: async (postId: string) => {
-      // Find the post and check its current liked state
-      const post = newPosts.find((p) => p.id === postId);
-      if (!post) return null;
-      const postOwnerId = post.userId;
-      const isCurrentlyLiked = post.isLiked;
+const likeMutation = useMutation({
+  mutationFn: ({ postId, isLiked }: { postId: string; isLiked: boolean }) => {
+    if (isLiked) {
+      return axios.delete(`/api/posts/${postId}/like`);
+    } else {
+      return axios.post(`/api/posts/${postId}/like`);
+    }
+  },
+  onMutate: ({ postId }) => {
+    setNewPosts((prev) => {
+      const updated = prev.map((post) => {
+        if (post.id === postId) {
+          const isCurrentlyLiked = post.isLiked;
+          const newIsLiked = !isCurrentlyLiked;
+          const newLikes = post.likes + (newIsLiked ? 1 : -1);
 
-      // Immediately update UI optimistically
-      setNewPosts((prevPosts) =>
-        prevPosts.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                isLiked: !p.isLiked,
-                likes: p.isLiked ? p.likes - 1 : p.likes + 1,
-              }
-            : p
-        )
-      );
+          const updatedPost = { ...post, isLiked: newIsLiked, likes: newLikes };
 
-      try {
-        const { data: existingLike, error: likeError } = await supabase
-          .from("likes")
-          .select("id")
-          .eq("post_id", postId)
-          .eq("user_id", userId)
-          .single();
-
-        if (likeError && likeError.code !== "PGRST116") {
-          throw new Error(`Error checking like: ${likeError.message}`);
-        }
-
-        let actionPerformed = "";
-        if (existingLike) {
-          const { error: deleteError } = await supabase
-            .from("likes")
-            .delete()
-            .eq("id", existingLike.id);
-          if (deleteError)
-            throw new Error(`Error removing like: ${deleteError.message}`);
-          actionPerformed = "unlike";
-        } else {
-          const { error: insertError } = await supabase
-            .from("likes")
-            .insert({ post_id: postId, user_id: userId });
-          if (insertError)
-            throw new Error(`Error adding like: ${insertError.message}`);
-          actionPerformed = "like";
-        }
-
-        // Create notification if action is like and post is not by current user
-        if (
-          actionPerformed === "like" &&
-          userId &&
-          postOwnerId &&
-          userId !== postOwnerId
-        ) {
-          const { data: actorProfile } = await supabase
-            .from("profiles")
-            .select("username")
-            .eq("id", userId)
-            .single();
-
-          const actorUsername = actorProfile?.username || "Someone";
-          const notificationContent = `${actorUsername} liked your post`;
-
-          await createNotification(
-            postOwnerId,
-            userId,
-            postId,
-            null,
-            "like",
-            notificationContent
+          // In log ở đây là chính xác nhất
+          console.log(
+            'Like count AFTER OPTIMISTIC (safe):',
+            updatedPost.likes,
+            'isLiked:',
+            updatedPost.isLiked
           );
+
+          return updatedPost;
         }
-        
-        return { postId, success: true };
-      } catch (error) {
-        // If there was an error, revert the optimistic update
-        setNewPosts((prevPosts) =>
-          prevPosts.map((p) =>
-            p.id === postId
-              ? {
-                  ...p,
-                  isLiked: isCurrentlyLiked,
-                  likes: isCurrentlyLiked ? p.likes + 1 : p.likes - 1,
-                }
-              : p
-          )
-        );
-        throw error;
-      }
-    },
-    onError: (err) => {
-      console.error("Like error:", err);
-      Alert.alert("Error", "Failed to update like status");
-    },
-  });
+        return post;
+      });
+      return updated;
+    });
+  },
+  onSuccess: (_data, variables) => {
+    setNewPosts((prev) => {
+      const updated = prev.map((post) => {
+        if (post.id === variables.postId) {
+          const newIsLiked = !post.isLiked;
+          const newLikes = post.likes + (newIsLiked ? 1 : -1);
+
+          const updatedPost = { ...post, isLiked: newIsLiked, likes: newLikes };
+
+          // Log chuẩn xác sau khi mutation thành công
+          console.log(
+            'Like count AFTER MUTATION:',
+            updatedPost.likes,
+            'isLiked:',
+            updatedPost.isLiked
+          );
+
+          return updatedPost;
+        }
+        return post;
+      });
+      return updated;
+    });
+  },
+});
 
   // Mutation cho repost
   const repostMutation = useMutation({
@@ -218,7 +178,11 @@ export default function HomeScreen() {
     },
     onError: (err) => {
       console.error("Repost error:", err);
+      Alert.alert("Error", "Failed to update like status");
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts", userId] });
+    }
   });
 
   useFocusEffect(
@@ -240,7 +204,8 @@ export default function HomeScreen() {
       alert("Please log in to like a post.");
       return;
     }
-    likeMutation.mutate(postId);
+    const post = newPosts.find((p) => p.id === postId);
+    likeMutation.mutate({ postId, isLiked: !!post?.isLiked });
   };
 
   const handleComment = async (postId: string) => {
