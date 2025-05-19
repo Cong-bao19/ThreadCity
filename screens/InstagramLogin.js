@@ -1,5 +1,7 @@
 // screens/InstagramLogin.js
 import React, { useState } from "react";
+import { FontAwesome } from "@expo/vector-icons"; // icon Facebook
+
 import {
   View,
   TextInput,
@@ -19,7 +21,7 @@ export default function InstagramLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [secureTextEntry, setSecureTextEntry] = useState(true);
-  const [loading, setLoading] = useState(false); // Thêm trạng thái loading
+  const [loading, setLoading] = useState(false);
   const { setUser } = useUser();
 
   const handleLogin = async () => {
@@ -44,15 +46,31 @@ export default function InstagramLogin() {
       if (data.user) {
         setUser(data.user);
         console.log("User ID:", data.user.id);
-        console.log("Login success:", data.user);
         alert("Đăng nhập thành công");
-        // Không cần router.replace("/") vì app/_layout.js sẽ xử lý điều hướng
       }
     } catch (err) {
       console.error("Unexpected error:", err);
       alert("Lỗi không xác định khi đăng nhập");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFacebookLogin = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "facebook",
+      });
+
+      if (error) {
+        console.error("Facebook login error:", error.message);
+        alert("Không thể đăng nhập bằng Facebook");
+      } else {
+        console.log("Redirecting to Facebook...");
+      }
+    } catch (err) {
+      console.error("Unexpected Facebook login error:", err);
+      alert("Đã xảy ra lỗi khi đăng nhập Facebook");
     }
   };
 
@@ -78,7 +96,7 @@ export default function InstagramLogin() {
             onChangeText={setUsername}
             keyboardType="email-address"
             autoCapitalize="none"
-            editable={!loading} // Vô hiệu hóa khi đang loading
+            editable={!loading}
           />
           <TextInput
             style={styles.input}
@@ -109,6 +127,22 @@ export default function InstagramLogin() {
             ) : (
               <Text style={styles.loginButtonText}>Log In</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleFacebookLogin}
+            style={styles.facebookButton}
+            disabled={loading}
+          >
+            <FontAwesome
+              name="facebook"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 10 }}
+            />
+            <Text style={styles.facebookButtonText}>
+              Continue with Facebook
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -155,10 +189,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     alignItems: "center",
   },
-  loginButtonDisabled: {
-    backgroundColor: "#a0c4ff",
-  },
+  loginButtonDisabled: { backgroundColor: "#a0c4ff" },
   loginButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  facebookButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1877F2",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginTop: 10,
+    justifyContent: "center",
+  },
+  facebookButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   signupContainer: {
     flexDirection: "row",
     justifyContent: "center",
