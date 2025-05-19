@@ -24,7 +24,7 @@ export default function EditProfile() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Lấy userId của người dùng hiện tại
+  // Get current user's userId
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -32,7 +32,7 @@ export default function EditProfile() {
       } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        // Tải dữ liệu hồ sơ hiện tại từ Supabase
+        // Load current profile data from Supabase
         const { data, error } = await supabase
           .from("profiles")
           .select("username, bio, link, is_private")
@@ -92,7 +92,7 @@ export default function EditProfile() {
       }
 
       Alert.alert("Success", "Profile updated successfully!");
-      router.back(); // Quay lại trang trước (Profile)
+      router.back();
     } catch (error) {
       console.error("Unexpected error:", error);
       Alert.alert("Error", "An unexpected error occurred. Please try again.");
@@ -102,16 +102,16 @@ export default function EditProfile() {
   };
 
   const handleClose = () => {
-    router.back(); // Quay lại trang trước (Profile)
+    router.back();
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose}>
-          <Icon name="close" size={24} color="#000" />
+          <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.headerText}>Edit Profile</Text>
+        <Text style={styles.headerText}>Edit profile</Text>
         <TouchableOpacity onPress={handleDone} disabled={loading}>
           <Text style={[styles.doneText, loading && styles.disabledText]}>
             {loading ? "Saving..." : "Done"}
@@ -137,7 +137,7 @@ export default function EditProfile() {
             style={[styles.input, styles.bioInput]}
             value={bio}
             onChangeText={setBio}
-            placeholder="Enter your bio"
+            placeholder="+ Write bio"
             placeholderTextColor="#aaa"
             multiline
           />
@@ -149,7 +149,7 @@ export default function EditProfile() {
             style={styles.input}
             value={link}
             onChangeText={setLink}
-            placeholder="Add link"
+            placeholder="+ Add link"
             placeholderTextColor="#aaa"
           />
         </View>
@@ -161,6 +161,7 @@ export default function EditProfile() {
             onValueChange={setIsPrivate}
             trackColor={{ false: "#ddd", true: "#3897f0" }}
             thumbColor={isPrivate ? "#fff" : "#fff"}
+            style={styles.switch}
           />
         </View>
       </View>
@@ -179,12 +180,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
   },
   headerText: {
     fontSize: 18,
     fontWeight: "bold",
+    color: "#000",
+  },
+  cancelText: {
+    fontSize: 16,
+    color: "#000",
   },
   doneText: {
     fontSize: 16,
@@ -205,14 +209,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 5,
+    color: "#000",
   },
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 5,
-    padding: 10,
+    borderRadius: 20,
+    padding: 12,
     fontSize: 14,
-    color: "#000",
+    color: "#333",
+    backgroundColor: "#f9f9f9",
   },
   bioInput: {
     height: 80,
@@ -223,5 +229,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+  },
+  switch: {
+    transform: [{ scaleX: 1.1 }, { scaleY: 1.1 }],
   },
 });
